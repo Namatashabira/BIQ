@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>{{ business }} – Business Report</title>
+
+    <style>
+        body {
+            font-family: "Georgia", "Times New Roman", serif;
+            color: #222;
+            margin: 40px;
+            line-height: 1.6;
+        }
+
+        h1 {
+            text-align: center;
+            font-size: 28px;
+            margin-bottom: 5px;
+        }
+
+        h2 {
+            text-align: center;
+            font-size: 16px;
+            font-weight: normal;
+            margin-bottom: 30px;
+        }
+
+        h3 {
+            font-size: 18px;
+            margin-top: 40px;
+            border-bottom: 1px solid #ddd;
+            padding-bottom: 6px;
+        }
+
+        p {
+            font-size: 14px;
+            margin: 12px 0;
+        }
+
+        .meta {
+            text-align: center;
+            font-size: 13px;
+            color: #555;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 16px;
+            font-size: 13px;
+        }
+
+        th, td {
+            border: 1px solid #ccc;
+            padding: 8px;
+        }
+
+        th {
+            background: #f2f2f2;
+            text-align: left;
+        }
+
+        .right {
+            text-align: right;
+        }
+
+        .footer {
+            margin-top: 60px;
+            font-size: 12px;
+            color: #777;
+            text-align: center;
+        }
+
+        .page-break {
+            page-break-before: always;
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- COVER -->
+    <h1>{{ business }}</h1>
+    <h2>Business Performance Report</h2>
+
+    <div class="meta">
+        Reporting Period: {{ start_date }} – {{ end_date }} <br />
+        Date Generated: {{ generated_at|date:"d F Y" }}
+    </div>
+
+    <!-- EXECUTIVE SUMMARY -->
+    <h3>1. Executive Summary</h3>
+    <p>{{ report.executive_summary }}</p>
+
+    <!-- SALES -->
+    <h3>2. Sales Performance</h3>
+    <p>{{ report.sales.narrative }}</p>
+
+    <table>
+        <tr>
+            <th>Metric</th>
+            <th class="right">Value</th>
+        </tr>
+        <tr>
+            <td>Total Sales</td>
+            <td class="right">UGX {{ report.sales.metrics.total_sales|floatformat:0 }}</td>
+        </tr>
+        <tr>
+            <td>Total Orders</td>
+            <td class="right">{{ report.sales.metrics.total_orders }}</td>
+        </tr>
+        <tr>
+            <td>Average Order Value</td>
+            <td class="right">UGX {{ report.sales.metrics.average_order_value|floatformat:0 }}</td>
+        </tr>
+    </table>
+
+    <!-- EXPENSES -->
+    <h3>3. Expense Analysis</h3>
+    <p>{{ report.expenses.narrative }}</p>
+
+    <table>
+        <tr>
+            <th>Category</th>
+            <th class="right">Amount (UGX)</th>
+        </tr>
+        {% for row in report.expenses.metrics.breakdown %}
+        <tr>
+            <td>{{ row.category__name }}</td>
+            <td class="right">{{ row.total|floatformat:0 }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+
+    <!-- TAX -->
+    <h3>4. Tax Summary</h3>
+    <p>
+        VAT collected during the reporting period amounted to
+        <strong>UGX {{ report.taxes.vat_collected|floatformat:0 }}</strong>.
+    </p>
+
+    <!-- INVENTORY -->
+    <h3>5. Inventory & Stock Status</h3>
+    <p>{{ report.inventory.narrative }}</p>
+
+    {% if report.inventory.metrics.low_stock_items %}
+    <table>
+        <tr>
+            <th>Product</th>
+            <th class="right">Quantity</th>
+        </tr>
+        {% for item in report.inventory.metrics.low_stock_items %}
+        <tr>
+            <td>{{ item.name }}</td>
+            <td class="right">{{ item.quantity }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% endif %}
+
+    <!-- CONCLUSION -->
+    <h3>6. Conclusion</h3>
+    <p>
+        This report provides a structured overview of business performance
+        during the selected period. Continuous monitoring of sales trends,
+        cost controls, and inventory levels is essential for sustained growth.
+    </p>
+
+    <div class="footer">
+        Generated automatically by the Business Reporting System
+    </div>
+
+</body>
+</html>

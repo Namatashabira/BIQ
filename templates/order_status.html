@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Check Order Status</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .order { border: 1px solid #ddd; padding: 15px; margin: 10px 0; border-radius: 5px; }
+        .status { font-weight: bold; padding: 5px 10px; border-radius: 3px; color: white; }
+        .pending { background-color: #f39c12; }
+        .confirmed { background-color: #27ae60; }
+        .cancelled { background-color: #e74c3c; }
+        input, button { padding: 10px; margin: 5px; }
+    </style>
+</head>
+<body>
+    <h1>Check Your Order Status</h1>
+    
+    <div>
+        <input type="email" id="emailInput" placeholder="Enter your email" required>
+        <button onclick="checkOrders()">Check Orders</button>
+    </div>
+    
+    <div id="ordersContainer"></div>
+
+    <script>
+        async function checkOrders() {
+            const email = document.getElementById('emailInput').value;
+            if (!email) {
+                alert('Please enter your email');
+                return;
+            }
+
+            try {
+                const response = await fetch(`/api/core/user/orders/?email=${email}`);
+                const orders = await response.json();
+                
+                const container = document.getElementById('ordersContainer');
+                
+                if (orders.length === 0) {
+                    container.innerHTML = '<p>No orders found for this email.</p>';
+                    return;
+                }
+                
+                container.innerHTML = orders.map(order => `
+                    <div class="order">
+                        <h3>Order #${order.id}</h3>
+                        <p><strong>Date:</strong> ${new Date(order.date).toLocaleDateString()}</p>
+                        <p><strong>Status:</strong> <span class="status ${order.status}">${order.status.toUpperCase()}</span></p>
+                        <p><strong>Total:</strong> $${order.total}</p>
+                        <p><strong>Items:</strong></p>
+                        <ul>
+                            ${order.items.map(item => `
+                                <li>${item.product_name} - Qty: ${item.quantity} - $${item.price}</li>
+                            `).join('')}
+                        </ul>
+                    </div>
+                `).join('');
+                
+            } catch (error) {
+                document.getElementById('ordersContainer').innerHTML = 
+                    '<p>Error loading orders. Please try again.</p>';
+                console.error('Error:', error);
+            }
+        }
+    </script>
+</body>
+</html>
