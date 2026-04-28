@@ -1,7 +1,15 @@
 from django.urls import path
+from django.http import JsonResponse
 from .views import UserOrderView, AdminOrderView, order_status_page, place_order
 
+
+def health_check(request):
+    return JsonResponse({"status": "ok"})
+
+
 urlpatterns = [
+    path('health/', health_check, name='health-check'),
+
     # User places an order on the frontend
     path('user/orders/', UserOrderView.as_view(), name='user-orders'),
     
