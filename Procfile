@@ -1,1 +1,1 @@
-web: gunicorn admin_panel.wsgi:application --chdir admin_dashboard_backend
+web: gunicorn admin_panel.wsgi:application

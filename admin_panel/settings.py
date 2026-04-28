@@ -111,6 +111,8 @@ if 'runserver' in sys.argv or 'gunicorn' in sys.argv or 'uwsgi' in sys.argv:
             "http://127.0.0.1:5174",
             "http://localhost:5175",
             "http://127.0.0.1:5175",
+            "https://web.railway.internal",
+            "https://namatashabira.github.io",
         ]
 else:
     CORS_ALLOWED_ORIGINS = [
@@ -118,33 +120,27 @@ else:
     "http://127.0.0.1:5176",
     "http://localhost:5173",
     "http://127.0.0.1:5173",
-    "http://localhost:5174",  # User frontend port
-    "http://127.0.0.1:5174",  # User frontend port
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
     "http://localhost:5175",
     "http://127.0.0.1:5175",
+    "https://web.railway.internal",
+    "https://namatashabira.github.io",
 ]
 
 CSRF_TRUSTED_ORIGINS = [
-    "http://localhost:5176",  # Admin Frontend
-    "http://127.0.0.1:5176",  # Admin Frontend
-    "http://localhost:5173",  # User Frontend
-    "http://127.0.0.1:5173",  # User Frontend
-    "http://localhost:5174",  # User Frontend (main port)
-    "http://127.0.0.1:5174",  # User Frontend (main port)
-    "http://localhost:5175",  # Admin Frontend (alternate port)
-    "http://127.0.0.1:5175",  # Admin Frontend (alternate port)
+    "http://localhost:5176",
+    "http://127.0.0.1:5176",
+    "http://localhost:5173",
+    "http://127.0.0.1:5173",
+    "http://localhost:5174",
+    "http://127.0.0.1:5174",
+    "http://localhost:5175",
+    "http://127.0.0.1:5175",
+    "https://web.railway.internal",
+    "https://namatashabira.github.io",
 ]
 CORS_ALLOW_ALL_ORIGINS = True  # Temporarily allow all origins for testing
-
-# Add Railway + GitHub Pages to trusted origins
-_extra_origins = [
-    o for o in [
-        os.getenv("RAILWAY_PUBLIC_DOMAIN", ""),
-        os.getenv("FRONTEND_GITHUB_URL", ""),
-    ] if o
-]
-if _extra_origins:
-    CSRF_TRUSTED_ORIGINS += [f"https://{o}" if not o.startswith("http") else o for o in _extra_origins]
 CORS_ALLOW_HEADERS = [
     'accept',
     'accept-encoding',
