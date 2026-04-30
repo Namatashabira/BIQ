@@ -325,7 +325,7 @@ def get_configuration_summary(request):
             'primary_color': theme.primary_color,
             'secondary_color': theme.secondary_color,
             'accent_color': theme.accent_color,
-            'logo_url': request.build_absolute_uri(theme.logo.url) if theme.logo else None,
+            'logo_url': theme.logo.url if theme.logo else None,
             # Backward compatibility: expose selected_palette_id as color hex
             'selected_palette_id': getattr(theme, 'selected_palette_id', None) or theme.color,
             'color': theme.color,

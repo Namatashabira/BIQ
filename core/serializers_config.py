@@ -98,9 +98,18 @@ class ThemeSerializer(serializers.ModelSerializer):
     
     def get_logo_url(self, obj):
         if obj.logo:
-            request = self.context.get('request')
-            if request:
-                return request.build_absolute_uri(obj.logo.url)
+            try:
+                url = obj.logo.url
+                # Cloudinary returns full https:// URLs — return as-is
+                if url.startswith('http://') or url.startswith('https://'):
+                    return url
+                # Fallback for local dev
+                request = self.context.get('request')
+                if request:
+                    return request.build_absolute_uri(url)
+                return url
+            except Exception:
+                return None
         return None
     
     def get_primary_color(self, obj):

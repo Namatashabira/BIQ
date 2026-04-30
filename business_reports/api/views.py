@@ -25,6 +25,21 @@ def _resolve_tenant(request):
     return tenant
 
 
+def _get_logo_url(tenant):
+    """Fetch Cloudinary logo URL for the tenant's theme."""
+    if not tenant:
+        return None
+    try:
+        from core.business_config import Theme
+        theme = Theme.objects.get(tenant=tenant)
+        if theme.logo:
+            url = theme.logo.url
+            return url if url else None
+    except Exception:
+        pass
+    return None
+
+
 def _get_date_range(request):
     start = parse_date(request.GET.get('start') or '')
     end = parse_date(request.GET.get('end') or '')
@@ -90,6 +105,7 @@ def generate_business_report_pdf(request):
         business_name=tenant.name,
         start_date=start_date,
         end_date=end_date,
+        logo_url=_get_logo_url(tenant),
     ).build()
 
     filename = f"business_report_{start_date}_{end_date}.pdf"

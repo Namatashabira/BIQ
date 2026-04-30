@@ -1,6 +1,7 @@
 from django.db import models
 from datetime import date
 from tenants.models import Tenant
+from cloudinary.models import CloudinaryField
 
 
 class Product(models.Model):
@@ -47,11 +48,12 @@ class Product(models.Model):
     # ==========================
     # Images
     # ==========================
-    image = models.ImageField(
-        upload_to="products/",
+    image = CloudinaryField(
+        'image',
+        folder='products',
         blank=True,
         null=True,
-        help_text="Primary/featured image"
+        help_text="Primary/featured image — stored on Cloudinary"
     )
 
     image_display_style = models.CharField(
@@ -197,7 +199,7 @@ class ProductImage(models.Model):
         related_name="product_images",
     )
 
-    image = models.ImageField(upload_to="products/")
+    image = CloudinaryField('image', folder='products')
     alt_text = models.CharField(max_length=255, blank=True)
     display_order = models.PositiveIntegerField(default=0)
 

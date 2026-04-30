@@ -485,6 +485,20 @@ class ReceiptView(APIView):
                 user.save(update_fields=['tenant'])
         return tenant
 
+    def _get_logo_url(self, tenant):
+        """Fetch the Cloudinary logo URL for the tenant's theme."""
+        if not tenant:
+            return None
+        try:
+            from core.business_config import Theme
+            theme = Theme.objects.get(tenant=tenant)
+            if theme.logo:
+                url = theme.logo.url
+                return url if url else None
+        except Exception:
+            pass
+        return None
+
     def get(self, request):
         logger.info(f"GET /api/receipts/ - IP: {request.META.get('REMOTE_ADDR')}")
         receipt_number = request.query_params.get('receipt_number')
@@ -529,6 +543,7 @@ class ReceiptView(APIView):
                     'debtPartialPaymentMethod': receipt.debt_partial_payment_method,
                     'debtPartialMobileNumber': receipt.debt_partial_mobile_number,
                     'createdAt': receipt.created_at.isoformat(),
+                    'logoUrl': self._get_logo_url(receipt.tenant),
                     'items': [{
                         'productName': item.product_name,
                         'quantity': item.quantity,
@@ -627,6 +642,7 @@ class ReceiptView(APIView):
                 'customerLocation': customer_location,
                 'totalAmount': float(receipt.total_amount),
                 'createdAt': receipt.created_at.isoformat(),
+                'logoUrl': self._get_logo_url(tenant),
             }
         }, status=201)
 

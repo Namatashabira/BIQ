@@ -8,6 +8,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from django.conf import settings
 from tenants.models import Tenant
+from cloudinary.models import CloudinaryField
 
 # Shared defaults for pricing settings so frontend and backend stay in sync
 PRICING_DEFAULTS = {
@@ -721,8 +722,8 @@ class Theme(models.Model):
         related_name='theme'
     )
     
-    # Logo
-    logo = models.ImageField(upload_to='logos/', null=True, blank=True)
+    # Logo — stored on Cloudinary
+    logo = CloudinaryField('image', folder='logos', null=True, blank=True)
     
     # Color identifier - used to lookup full triplet
     color = models.CharField(

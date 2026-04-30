@@ -1,4 +1,5 @@
 from io import BytesIO
+import urllib.request
 from reportlab.platypus import (
     SimpleDocTemplate,
     Paragraph,
@@ -6,6 +7,7 @@ from reportlab.platypus import (
     Table,
     TableStyle,
     PageBreak,
+    Image,
 )
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.pagesizes import A4
@@ -20,11 +22,12 @@ class BusinessReportPDFBuilder:
     Builds a professional PDF business report from structured report data.
     """
 
-    def __init__(self, report_data, business_name, start_date, end_date):
+    def __init__(self, report_data, business_name, start_date, end_date, logo_url=None):
         self.report = report_data
         self.business_name = business_name
         self.start_date = start_date
         self.end_date = end_date
+        self.logo_url = logo_url
         self.buffer = BytesIO()
         self.styles = getSampleStyleSheet()
 
@@ -87,6 +90,17 @@ class BusinessReportPDFBuilder:
         # -----------------------------
         # COVER PAGE
         # -----------------------------
+        if self.logo_url:
+            try:
+                with urllib.request.urlopen(self.logo_url, timeout=5) as resp:
+                    logo_data = BytesIO(resp.read())
+                logo_img = Image(logo_data, width=4 * cm, height=4 * cm)
+                logo_img.hAlign = 'CENTER'
+                elements.append(logo_img)
+                elements.append(Spacer(1, 12))
+            except Exception:
+                pass
+
         elements.append(Paragraph(self.business_name, self.styles["TitleStyle"]))
         elements.append(Spacer(1, 12))
 

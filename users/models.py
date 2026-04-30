@@ -1,18 +1,19 @@
 from django.db import models
 from django.contrib.auth import get_user_model
 from tenants.models import Tenant
+from cloudinary.models import CloudinaryField
 
 User = get_user_model()
 
 
 class UserProfile(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='profile', null=True, blank=True)
-    guest_token = models.CharField(max_length=64, unique=True, null=True, blank=True)  # For guests
+    guest_token = models.CharField(max_length=64, unique=True, null=True, blank=True)
     name = models.CharField(max_length=100, blank=True)
     email = models.EmailField(blank=True)
     phone = models.CharField(max_length=20, blank=True)
     address = models.TextField(blank=True)
-    profile_picture = models.ImageField(upload_to='profile_pictures/', null=True, blank=True)
+    profile_picture = CloudinaryField('image', folder='profile_pictures', null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
