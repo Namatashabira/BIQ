@@ -83,6 +83,7 @@ urlpatterns = [
     path('auth/login/', login, name='login'),
     path('auth/logout/', logout, name='logout'),
     path('auth/profile/', user_profile, name='user-profile'),
+    path('health/', lambda request: __import__('django.http', fromlist=['JsonResponse']).JsonResponse({'status': 'ok'}), name='health'),
     path('auth/password-reset/request/', request_password_reset, name='password-reset-request'),
     path('auth/password-reset/verify/', verify_reset_token, name='password-reset-verify'),
     path('auth/password-reset/confirm/', confirm_password_reset, name='password-reset-confirm'),
