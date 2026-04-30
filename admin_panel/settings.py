@@ -28,9 +28,14 @@ INSTALLED_APPS = [
     "sales",
     "forecast",
     "business_reports",
-    "cloudinary",
-    "cloudinary_storage",
 ]
+
+# Add Cloudinary apps only if the package is installed
+try:
+    import cloudinary  # noqa
+    INSTALLED_APPS += ["cloudinary", "cloudinary_storage"]
+except ImportError:
+    pass
 
 # --------------------------------------
 # BASE DIRECTORY
@@ -235,7 +240,11 @@ CLOUDINARY_STORAGE = {
 
 # Use Cloudinary for media file storage in production
 if not DEBUG:
-    DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+    try:
+        import cloudinary_storage  # noqa
+        DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+    except ImportError:
+        pass
 
 try:
     import cloudinary
