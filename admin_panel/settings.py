@@ -233,17 +233,20 @@ CLOUDINARY_STORAGE = {
     'API_SECRET': os.getenv('CLOUDINARY_API_SECRET', ''),
 }
 
-import cloudinary
-cloudinary.config(
-    cloud_name=os.getenv('CLOUDINARY_CLOUD_NAME', ''),
-    api_key=os.getenv('CLOUDINARY_API_KEY', ''),
-    api_secret=os.getenv('CLOUDINARY_API_SECRET', ''),
-    secure=True,
-)
-
 # Use Cloudinary for media file storage in production
 if not DEBUG:
     DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+
+try:
+    import cloudinary
+    cloudinary.config(
+        cloud_name=os.getenv('CLOUDINARY_CLOUD_NAME', ''),
+        api_key=os.getenv('CLOUDINARY_API_KEY', ''),
+        api_secret=os.getenv('CLOUDINARY_API_SECRET', ''),
+        secure=True,
+    )
+except ImportError:
+    pass
 
 # --------------------------------------
 # REST FRAMEWORK
