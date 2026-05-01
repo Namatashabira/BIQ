@@ -92,6 +92,7 @@ class Product(models.Model):
     # ==========================
     expiry_date = models.DateField(null=True, blank=True)
     manufacture_date = models.DateField(null=True, blank=True)
+    date_stocked = models.DateField(null=True, blank=True)
     batch_number = models.CharField(max_length=100, blank=True)
     supplier = models.CharField(max_length=255, blank=True)
 

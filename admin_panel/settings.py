@@ -3,6 +3,13 @@ from pathlib import Path
 from datetime import timedelta
 import dj_database_url
 
+# Load .env file
+try:
+    from dotenv import load_dotenv
+    load_dotenv(Path(__file__).resolve().parent.parent / '.env')
+except ImportError:
+    pass
+
 INSTALLED_APPS = [
     "django.contrib.contenttypes",
     "django.contrib.auth",
@@ -239,12 +246,16 @@ CLOUDINARY_STORAGE = {
 }
 
 # Use Cloudinary for media file storage in production
-if not DEBUG:
-    try:
-        import cloudinary_storage  # noqa
-        DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
-    except ImportError:
-        pass
+CLOUDINARY_CONFIGURED = all([
+    os.getenv('CLOUDINARY_CLOUD_NAME'),
+    os.getenv('CLOUDINARY_API_KEY'),
+    os.getenv('CLOUDINARY_API_SECRET'),
+])
+
+if CLOUDINARY_CONFIGURED:
+    DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+else:
+    DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
 
 try:
     import cloudinary
@@ -262,11 +273,12 @@ except ImportError:
 # --------------------------------------
 REST_FRAMEWORK = {
     "DEFAULT_PERMISSION_CLASSES": [
-        "rest_framework.permissions.IsAuthenticated",  # tightened for multi-tenant
+        "rest_framework.permissions.IsAuthenticated",
     ],
     "DEFAULT_AUTHENTICATION_CLASSES": [
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ],
+    "EXCEPTION_HANDLER": "core.exceptions.custom_exception_handler",
 }
 
 # --------------------------------------
@@ -332,11 +344,16 @@ LOGGING = {
         },
         'django.request': {
             'handlers': ['console'],
-            'level': 'INFO',
+            'level': 'ERROR',
             'propagate': False,
         },
         'core': {
             'handlers': ['console', 'file'],
+            'level': 'DEBUG',
+            'propagate': False,
+        },
+        'product': {
+            'handlers': ['console'],
             'level': 'DEBUG',
             'propagate': False,
         },

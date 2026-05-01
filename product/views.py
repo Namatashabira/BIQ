@@ -8,7 +8,7 @@ from channels.layers import get_channel_layer
 
 from rest_framework import viewsets, status
 from rest_framework.response import Response
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.permissions import IsAuthenticated, AllowAny
 from rest_framework.decorators import action
 
@@ -26,7 +26,7 @@ class ProductViewSet(viewsets.ModelViewSet):
 
     serializer_class = ProductSerializer
     permission_classes = [IsAuthenticated]
-    parser_classes = [MultiPartParser, FormParser]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     # ==================================================
     # Tenant resolution
@@ -111,6 +111,8 @@ class ProductViewSet(viewsets.ModelViewSet):
         try:
             with transaction.atomic():
                 self.perform_create(serializer)
+        except PermissionError as exc:
+            return Response({"error": str(exc)}, status=status.HTTP_403_FORBIDDEN)
         except IntegrityError as exc:
             if "unique_product_name_per_tenant" in str(exc):
                 return Response(
@@ -388,29 +390,24 @@ class ProductViewSet(viewsets.ModelViewSet):
     # ==================================================
     def _broadcast(self, tenant_uuid, action, payload):
         """
-        Broadcast tenant-specific product updates (now using tenant_uuid)
+        Broadcast tenant-specific product updates.
+        Failures are logged but never allowed to crash the HTTP response.
         """
-        channel_layer = get_channel_layer()
+        import logging
+        try:
+            channel_layer = get_channel_layer()
+            if not channel_layer:
+                return
 
-        # Always include tenant_uuid in payload for filtering on the client
-        payload_with_tenant = {"tenant_uuid": tenant_uuid, **payload}
+            payload_with_tenant = {"tenant_uuid": tenant_uuid, **payload}
 
-        # Tenant-specific broadcast
-        async_to_sync(channel_layer.group_send)(
-            f"products_tenant_{tenant_uuid}",
-            {
-                "type": "products.message",
-                "action": action,
-                "data": payload_with_tenant,
-            },
-        )
-
-        # Global broadcast for public/anonymous clients
-        async_to_sync(channel_layer.group_send)(
-            "products",
-            {
-                "type": "products.message",
-                "action": action,
-                "data": payload_with_tenant,
-            },
-        )
+            async_to_sync(channel_layer.group_send)(
+                f"products_tenant_{tenant_uuid}",
+                {"type": "products.message", "action": action, "data": payload_with_tenant},
+            )
+            async_to_sync(channel_layer.group_send)(
+                "products",
+                {"type": "products.message", "action": action, "data": payload_with_tenant},
+            )
+        except Exception as exc:
+            logging.getLogger(__name__).warning("WebSocket broadcast failed: %s", exc)

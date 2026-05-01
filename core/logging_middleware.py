@@ -33,24 +33,25 @@ class RequestLoggingMiddleware(MiddlewareMixin):
     
     def process_request(self, request):
         request.start_time = time.time()
-        
-        # Log request details
-        safe_log(f"{request.method} {request.get_full_path()} - IP: {self.get_client_ip(request)}")
-        
-        # Log request headers (excluding sensitive ones)
-        headers = {k: v for k, v in request.META.items() 
-                  if k.startswith('HTTP_') and 'AUTH' not in k and 'TOKEN' not in k}
-        if headers:
-            safe_log(f"Headers: {headers}", level="debug")
-            
-        # Log request body for POST/PUT/PATCH
-        if request.method in ['POST', 'PUT', 'PATCH'] and hasattr(request, 'body'):
-            try:
-                body = request.body.decode('utf-8')[:500]  # Limit to 500 chars
-                if body:
-                    safe_log(f"Request body: {body}")
-            except:
-                safe_log("Could not decode request body", level="debug")
+
+        try:
+            safe_log(f"{request.method} {request.get_full_path()} - IP: {self.get_client_ip(request)}")
+        except Exception:
+            pass
+
+        # Do NOT read request.body here — multipart/form-data uploads buffer the
+        # stream into request.FILES/request.POST lazily. Reading .body first
+        # consumes the stream and causes Django to raise RawPostDataException
+        # when the view later tries to parse the multipart data → 500.
+        if request.method in ['POST', 'PUT', 'PATCH']:
+            content_type = request.META.get('CONTENT_TYPE', '')
+            if 'multipart' not in content_type:
+                try:
+                    body = request.body.decode('utf-8')[:500]
+                    if body:
+                        safe_log(f"Request body: {body}")
+                except Exception:
+                    pass
     
     def process_response(self, request, response):
         # Calculate response time
