@@ -1,3 +1,4 @@
+import json
 from rest_framework import serializers
 from django.db import transaction
 
@@ -111,6 +112,21 @@ class ProductSerializer(serializers.ModelSerializer):
 
     def get_currency_symbol(self, obj):
         return CURRENCY_SYMBOLS.get(_get_currency(obj).upper(), _get_currency(obj))
+
+    # --------------------------------------------------
+    # Parse JSON string fields from multipart/form-data
+    # --------------------------------------------------
+    JSON_FIELDS = ["benefits", "growing_requirements", "ingredients", "directions", "display_settings", "custom_fields"]
+
+    def to_internal_value(self, data):
+        mutable = data.copy() if hasattr(data, "copy") else dict(data)
+        for field in self.JSON_FIELDS:
+            if field in mutable and isinstance(mutable[field], str):
+                try:
+                    mutable[field] = json.loads(mutable[field])
+                except (json.JSONDecodeError, ValueError):
+                    pass
+        return super().to_internal_value(mutable)
 
     # --------------------------------------------------
     # CREATE
