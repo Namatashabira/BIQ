@@ -1,3 +1,4 @@
+import uuid
 from django.db import models
 from django.utils import timezone
 from datetime import timedelta
@@ -73,3 +74,45 @@ class TenantSubscription(models.Model):
         if self.status == self.STATUS_TRIAL and self.is_trial_expired:
             self.status = self.STATUS_EXPIRED
             self.save(update_fields=['status', 'updated_at'])
+
+
+class PaymentRequest(models.Model):
+    STATUS_PENDING = 'pending'
+    STATUS_APPROVED = 'approved'
+    STATUS_REJECTED = 'rejected'
+
+    STATUS_CHOICES = [
+        (STATUS_PENDING, 'Pending'),
+        (STATUS_APPROVED, 'Approved'),
+        (STATUS_REJECTED, 'Rejected'),
+    ]
+
+    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name='payment_requests')
+    plan = models.ForeignKey(Plan, on_delete=models.PROTECT, related_name='payment_requests')
+    sender_name = models.CharField(max_length=200)
+    phone_number = models.CharField(max_length=30)
+    payment_method = models.CharField(max_length=20)  # mtn, airtel, bank
+    transaction_id = models.CharField(max_length=200)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default=STATUS_PENDING)
+    activation_code = models.CharField(max_length=20, blank=True)
+    code_expires_at = models.DateTimeField(null=True, blank=True)
+    code_used = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    admin_note = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.tenant.name} — {self.plan.name} — {self.status}"
+
+    def generate_code(self):
+        """Generate a unique 10-char uppercase activation code, expires in 24h."""
+        code = uuid.uuid4().hex[:10].upper()
+        self.activation_code = code
+        self.status = self.STATUS_APPROVED
+        self.code_expires_at = timezone.now() + timedelta(hours=24)
+        self.save(update_fields=['activation_code', 'status', 'code_expires_at', 'updated_at'])
+        return code
+

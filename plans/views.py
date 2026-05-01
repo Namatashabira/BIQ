@@ -1,18 +1,17 @@
 from django.utils import timezone
 from datetime import timedelta
 from rest_framework.decorators import api_view, permission_classes
-from rest_framework.permissions import AllowAny, IsAuthenticated
+from rest_framework.permissions import AllowAny, IsAuthenticated, IsAdminUser
 from rest_framework.response import Response
 from rest_framework import status
 
-from .models import Plan, TenantSubscription
-from .serializers import PlanSerializer, SubscriptionSerializer
+from .models import Plan, TenantSubscription, PaymentRequest
+from .serializers import PlanSerializer, SubscriptionSerializer, PaymentRequestSerializer
 
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
 def list_plans(request):
-    """Return all active plans — public endpoint used by Pricing page."""
     plans = Plan.objects.filter(is_active=True).order_by('price_ugx')
     return Response(PlanSerializer(plans, many=True).data)
 
@@ -20,14 +19,12 @@ def list_plans(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def my_subscription(request):
-    """Return the current tenant's subscription, auto-syncing trial expiry."""
     tenant = getattr(request.user, 'tenant', None)
     if not tenant:
         return Response({'error': 'No tenant found for this user.'}, status=status.HTTP_404_NOT_FOUND)
 
     sub = getattr(tenant, 'subscription', None)
 
-    # Auto-create a free trial subscription if none exists
     if not sub:
         free_plan = Plan.objects.filter(key='free').first()
         if not free_plan:
@@ -49,10 +46,6 @@ def my_subscription(request):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def select_plan(request):
-    """
-    Select or upgrade a plan.
-    Body: { "plan_key": "starter" | "business" | "enterprise" }
-    """
     tenant = getattr(request.user, 'tenant', None)
     if not tenant:
         return Response({'error': 'No tenant found.'}, status=status.HTTP_404_NOT_FOUND)
@@ -76,7 +69,6 @@ def select_plan(request):
     )
 
     if not created:
-        # Upgrade/change plan
         sub.plan = plan
         sub.status = TenantSubscription.STATUS_ACTIVE
         sub.trial_start = None
@@ -89,7 +81,6 @@ def select_plan(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def check_product_limit(request):
-    """Check if the tenant can add more products."""
     from product.models import Product
 
     tenant = getattr(request.user, 'tenant', None)
@@ -98,7 +89,6 @@ def check_product_limit(request):
 
     sub = getattr(tenant, 'subscription', None)
     if not sub:
-        # Default: free trial limits
         count = Product.objects.filter(tenant=tenant).count()
         return Response({'can_add': count < 7, 'current': count, 'limit': 7, 'plan': 'free'})
 
@@ -119,3 +109,206 @@ def check_product_limit(request):
         'plan': sub.plan.key,
         'days_left': sub.days_left,
     })
+
+
+# ── Payment Request (user submits payment proof) ──────────────────────────────
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def payment_profile(request):
+    tenant = getattr(request.user, 'tenant', None)
+    if not tenant:
+        return Response({'error': 'No tenant found.'}, status=status.HTTP_404_NOT_FOUND)
+    if request.method == 'GET':
+        pr = PaymentRequest.objects.filter(tenant=tenant).order_by('-created_at').first()
+        if pr:
+            return Response({'sender_name': pr.sender_name, 'phone_number': pr.phone_number})
+        return Response({'sender_name': '', 'phone_number': ''})
+    sender_name  = request.data.get('sender_name', '').strip()
+    phone_number = request.data.get('phone_number', '').strip()
+    PaymentRequest.objects.filter(tenant=tenant, code_used=False).update(
+        sender_name=sender_name, phone_number=phone_number
+    )
+    return Response({'sender_name': sender_name, 'phone_number': phone_number})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def submit_payment_request(request):
+    """
+    User submits payment details.
+    Body: { plan_key, sender_name, phone_number, payment_method, transaction_id }
+    """
+    tenant = getattr(request.user, 'tenant', None)
+    if not tenant:
+        return Response({'error': 'No tenant found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    plan_key = request.data.get('plan_key')
+    plan = Plan.objects.filter(key=plan_key, is_active=True).first()
+    if not plan:
+        return Response({'error': 'Invalid plan.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    sender_name = request.data.get('sender_name', '').strip()
+    phone_number = request.data.get('phone_number', '').strip()
+    payment_method = request.data.get('payment_method', '').strip()
+    transaction_id = request.data.get('transaction_id', '').strip()
+
+    if not all([sender_name, phone_number, payment_method, transaction_id]):
+        return Response({'error': 'All fields are required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Prevent duplicate pending requests for same transaction
+    if PaymentRequest.objects.filter(transaction_id=transaction_id, status=PaymentRequest.STATUS_PENDING).exists():
+        return Response({'error': 'A request with this transaction ID is already pending.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    pr = PaymentRequest.objects.create(
+        tenant=tenant,
+        plan=plan,
+        sender_name=sender_name,
+        phone_number=phone_number,
+        payment_method=payment_method,
+        transaction_id=transaction_id,
+    )
+
+    return Response({
+        'id': pr.id,
+        'message': 'Payment request submitted. You will receive an activation code once verified.',
+    }, status=status.HTTP_201_CREATED)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def activate_plan(request):
+    """
+    User enters activation code to unlock their plan.
+    Body: { activation_code }
+    """
+    tenant = getattr(request.user, 'tenant', None)
+    if not tenant:
+        return Response({'error': 'No tenant found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    code = request.data.get('activation_code', '').strip().upper()
+    if not code:
+        return Response({'error': 'Activation code is required.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    pr = PaymentRequest.objects.filter(
+        tenant=tenant,
+        activation_code=code,
+        status=PaymentRequest.STATUS_APPROVED,
+        code_used=False,
+    ).first()
+
+    if not pr:
+        return Response({'error': 'Invalid or already used activation code.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Check expiry
+    if pr.code_expires_at and timezone.now() > pr.code_expires_at:
+        return Response({'error': 'This activation code has expired. Please contact support.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    # Activate the plan
+    sub, created = TenantSubscription.objects.get_or_create(
+        tenant=tenant,
+        defaults={'plan': pr.plan, 'status': TenantSubscription.STATUS_ACTIVE}
+    )
+    if not created:
+        sub.plan = pr.plan
+        sub.status = TenantSubscription.STATUS_ACTIVE
+        sub.trial_start = None
+        sub.trial_end = None
+        sub.save(update_fields=['plan', 'status', 'trial_start', 'trial_end', 'updated_at'])
+
+    pr.code_used = True
+    pr.save(update_fields=['code_used', 'updated_at'])
+
+    return Response({
+        'message': f'Plan activated successfully! Welcome to {pr.plan.name}.',
+        'plan': pr.plan.key,
+    })
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def poll_activation_code(request):
+    """
+    User polls this endpoint after submitting payment.
+    Returns the activation code once admin has approved it.
+    """
+    tenant = getattr(request.user, 'tenant', None)
+    if not tenant:
+        return Response({'status': 'no_tenant'}, status=status.HTTP_404_NOT_FOUND)
+
+    pr = PaymentRequest.objects.filter(
+        tenant=tenant,
+        code_used=False,
+    ).order_by('-created_at').first()
+
+    if not pr:
+        return Response({'status': 'not_found'})
+
+    if pr.status == PaymentRequest.STATUS_PENDING:
+        return Response({'status': 'pending'})
+
+    if pr.status == PaymentRequest.STATUS_REJECTED:
+        return Response({'status': 'rejected'})
+
+    if pr.status == PaymentRequest.STATUS_APPROVED and pr.activation_code:
+        # Check expiry
+        if pr.code_expires_at and timezone.now() > pr.code_expires_at:
+            return Response({'status': 'expired'})
+        return Response({
+            'status': 'approved',
+            'activation_code': pr.activation_code,
+            'code_expires_at': pr.code_expires_at,
+            'plan_name': pr.plan.name,
+        })
+
+    return Response({'status': 'pending'})
+
+
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def admin_list_payment_requests(request):
+    """Super admin: list all payment requests."""
+    if not (request.user.is_staff or request.user.is_superuser):
+        return Response({'error': 'Forbidden.'}, status=status.HTTP_403_FORBIDDEN)
+
+    qs = PaymentRequest.objects.select_related('tenant', 'plan').all()
+    status_filter = request.query_params.get('status')
+    if status_filter:
+        qs = qs.filter(status=status_filter)
+
+    return Response(PaymentRequestSerializer(qs, many=True).data)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def admin_generate_code(request, pk):
+    """Super admin: approve a payment request and generate activation code."""
+    if not (request.user.is_staff or request.user.is_superuser):
+        return Response({'error': 'Forbidden.'}, status=status.HTTP_403_FORBIDDEN)
+
+    pr = PaymentRequest.objects.filter(pk=pk).first()
+    if not pr:
+        return Response({'error': 'Payment request not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    if pr.status == PaymentRequest.STATUS_APPROVED and pr.activation_code:
+        return Response({'activation_code': pr.activation_code, 'already_generated': True})
+
+    code = pr.generate_code()
+    return Response({'activation_code': code, 'request_id': pr.id})
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def admin_reject_request(request, pk):
+    """Super admin: reject a payment request."""
+    if not (request.user.is_staff or request.user.is_superuser):
+        return Response({'error': 'Forbidden.'}, status=status.HTTP_403_FORBIDDEN)
+
+    pr = PaymentRequest.objects.filter(pk=pk).first()
+    if not pr:
+        return Response({'error': 'Not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+    pr.status = PaymentRequest.STATUS_REJECTED
+    pr.admin_note = request.data.get('note', '')
+    pr.save(update_fields=['status', 'admin_note', 'updated_at'])
+    return Response({'message': 'Request rejected.'})

@@ -25,4 +25,10 @@ urlpatterns = [
     # AJAX endpoints for validation
     path('core/auth/check-email/', views.check_email_exists, name='check-email'),
     path('core/auth/check-username/', views.check_username_exists, name='check-username'),
+
+    # Superadmin user management
+    path('admin/all-users/', views.admin_list_all_users, name='admin-list-all-users'),
+    path('admin/delete-user/<int:user_id>/', views.admin_delete_user, name='admin-delete-user'),
+    path('admin/deactivate-user/<int:user_id>/', views.admin_deactivate_user, name='admin-deactivate-user'),
+    path('admin/reactivate-user/<int:user_id>/', views.admin_reactivate_user, name='admin-reactivate-user'),
 ]

@@ -237,3 +237,97 @@ def check_username_exists(request):
     username = request.GET.get('username')
     exists = User.objects.filter(username=username).exists()
     return JsonResponse({'exists': exists})
+
+
+# ───────────────────────────────────────────────────────────────────────────
+# Superadmin User Management APIs
+# ───────────────────────────────────────────────────────────────────────────
+@api_view(['GET'])
+@permission_classes([IsAuthenticated])
+def admin_list_all_users(request):
+    """Superadmin only: Get all users with their status and activity"""
+    if not (request.user.is_staff and request.user.is_superuser):
+        return Response({'error': 'Only superadmin can access this.'}, status=status.HTTP_403_FORBIDDEN)
+
+    from django.utils import timezone
+    from datetime import timedelta
+
+    users = User.objects.all().select_related('profile').order_by('-last_login')
+    
+    users_data = []
+    for user in users:
+        profile = user.profile if hasattr(user, 'profile') else None
+        last_login = user.last_login
+        is_online = last_login and (timezone.now() - last_login) < timedelta(minutes=5)
+
+        users_data.append({
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'name': profile.name if profile else user.first_name or user.username,
+            'is_staff': user.is_staff,
+            'is_superuser': user.is_superuser,
+            'is_active': user.is_active,
+            'is_online': is_online,
+            'last_login': last_login.isoformat() if last_login else None,
+            'date_joined': user.date_joined.isoformat(),
+            'tenant_name': user.tenant.name if hasattr(user, 'tenant') and user.tenant else 'N/A',
+        })
+
+    return Response(users_data)
+
+
+@api_view(['DELETE'])
+@permission_classes([IsAuthenticated])
+def admin_delete_user(request, user_id):
+    """Superadmin only: Delete a user"""
+    if not (request.user.is_staff and request.user.is_superuser):
+        return Response({'error': 'Only superadmin can delete users.'}, status=status.HTTP_403_FORBIDDEN)
+
+    if request.user.id == user_id:
+        return Response({'error': 'Cannot delete yourself.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        user = User.objects.get(id=user_id)
+        username = user.username
+        user.delete()
+        return Response({'message': f'User {username} deleted successfully.'})
+    except User.DoesNotExist:
+        return Response({'error': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+    except Exception as e:
+        return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def admin_deactivate_user(request, user_id):
+    """Superadmin only: Deactivate a user account"""
+    if not (request.user.is_staff and request.user.is_superuser):
+        return Response({'error': 'Only superadmin can deactivate users.'}, status=status.HTTP_403_FORBIDDEN)
+
+    if request.user.id == user_id:
+        return Response({'error': 'Cannot deactivate yourself.'}, status=status.HTTP_400_BAD_REQUEST)
+
+    try:
+        user = User.objects.get(id=user_id)
+        user.is_active = False
+        user.save(update_fields=['is_active'])
+        return Response({'message': f'User {user.username} deactivated.'})
+    except User.DoesNotExist:
+        return Response({'error': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def admin_reactivate_user(request, user_id):
+    """Superadmin only: Reactivate a deactivated user account"""
+    if not (request.user.is_staff and request.user.is_superuser):
+        return Response({'error': 'Only superadmin can reactivate users.'}, status=status.HTTP_403_FORBIDDEN)
+
+    try:
+        user = User.objects.get(id=user_id)
+        user.is_active = True
+        user.save(update_fields=['is_active'])
+        return Response({'message': f'User {user.username} reactivated.'})
+    except User.DoesNotExist:
+        return Response({'error': 'User not found.'}, status=status.HTTP_404_NOT_FOUND)
