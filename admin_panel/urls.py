@@ -43,6 +43,9 @@ urlpatterns = [
 
     # Business Reports app
     path('api/reports/', include('business_reports.api.urls')),
+
+    # Plans & Subscriptions
+    path('api/plans/', include('plans.urls')),
 ]
 
 # Serve media files in development
