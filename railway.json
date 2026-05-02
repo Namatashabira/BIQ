@@ -4,7 +4,7 @@
     "builder": "NIXPACKS"
   },
   "deploy": {
-    "preDeployCommand": "python manage.py migrate --noinput && python manage.py seed_plans",
+    "preDeployCommand": "python manage.py migrate --noinput && python manage.py seed_plans && python manage.py ensure_superadmin",
     "startCommand": "gunicorn admin_panel.wsgi:application --bind 0.0.0.0:$PORT",
     "healthcheckPath": "/api/core/health/",
     "restartPolicyType": "ON_FAILURE"
