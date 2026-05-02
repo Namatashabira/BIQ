@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Report Card</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            background-color: #f4f4f4;
+        }
+        .report-card {
+            width: 100%;
+            max-width: 800px;
+            margin: 20px auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        .header img {
+            max-width: 100px;
+        }
+        .header h1 {
+            margin: 10px 0;
+        }
+        .section {
+            margin-bottom: 20px;
+        }
+        .section h2 {
+            border-bottom: 2px solid #4CAF50;
+            padding-bottom: 5px;
+        }
+        .table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .table th, .table td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+        }
+        .table th {
+            background-color: #4CAF50;
+            color: white;
+        }
+        .profile, .attendance {
+            display: flex;
+            justify-content: space-between;
+        }
+        .profile div, .attendance div {
+            width: 48%;
+        }
+    </style>
+</head>
+<body>
+    <div class="report-card">
+        <div class="header">
+            <img src="/media/school_logo.png" alt="School Logo">
+            <h1>GREENFIELDS SECONDARY SCHOOL</h1>
+            <p>P.O. Box 256, Entebbe, Uganda</p>
+            <p>+256 700 123456 | +256 776 987654</p>
+            <p>info@greenfields.sc.ug | www.greenfields.sc.ug</p>
+        </div>
+
+        <div class="section">
+            <h2>Student Information</h2>
+            <p><strong>Student Name:</strong> {{ student.name }}</p>
+            <p><strong>Admission No.:</strong> {{ student.admission_no }}</p>
+            <p><strong>Index No.:</strong> {{ student.index_no }}</p>
+            <p><strong>Class:</strong> {{ student.class }}</p>
+            <p><strong>Stream:</strong> {{ student.stream }}</p>
+            <p><strong>Age:</strong> {{ student.age }}</p>
+            <p><strong>Gender:</strong> {{ student.gender }}</p>
+        </div>
+
+        <div class="section">
+            <h2>Subject Performance Summary</h2>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>No.</th>
+                        <th>Subject</th>
+                        <th>Average Score (%)</th>
+                        <th>Grade</th>
+                        <th>Remark</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for subject in subjects %}
+                    <tr>
+                        <td>{{ forloop.counter }}</td>
+                        <td>{{ subject.name }}</td>
+                        <td>{{ subject.average_score }}</td>
+                        <td>{{ subject.grade }}</td>
+                        <td>{{ subject.remark }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="section">
+            <h2>Competency Breakdown</h2>
+            <table class="table">
+                <thead>
+                    <tr>
+                        <th>Subject</th>
+                        <th>Knowledge & Understanding</th>
+                        <th>Skills (Application)</th>
+                        <th>Values & Attitudes</th>
+                        <th>Average (%)</th>
+                        <th>Grade</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for competency in competencies %}
+                    <tr>
+                        <td>{{ competency.subject }}</td>
+                        <td>{{ competency.knowledge }}</td>
+                        <td>{{ competency.skills }}</td>
+                        <td>{{ competency.values }}</td>
+                        <td>{{ competency.average }}</td>
+                        <td>{{ competency.grade }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="section profile">
+            <div>
+                <h2>Learner Profile</h2>
+                <ul>
+                    <li>Critical Thinking & Problem Solving: {{ learner_profile.critical_thinking }}</li>
+                    <li>Creativity & Innovation: {{ learner_profile.creativity }}</li>
+                    <li>Communication & Collaboration: {{ learner_profile.communication }}</li>
+                    <li>Self-management: {{ learner_profile.self_management }}</li>
+                    <li>Learning to Learn: {{ learner_profile.learning_to_learn }}</li>
+                </ul>
+            </div>
+            <div>
+                <h2>Attendance</h2>
+                <p><strong>Days Present:</strong> {{ attendance.present }}</p>
+                <p><strong>Days Absent:</strong> {{ attendance.absent }}</p>
+                <p><strong>Attendance Percentage:</strong> {{ attendance.percentage }}%</p>
+            </div>
+        </div>
+
+        <div class="section">
+            <h2>Teacher's Remark</h2>
+            <p>{{ teacher_remark }}</p>
+        </div>
+
+        <div class="section">
+            <h2>Signatures</h2>
+            <p><strong>Class Teacher:</strong> {{ class_teacher.name }}</p>
+            <p><strong>Head Teacher:</strong> {{ head_teacher.name }}</p>
+        </div>
+
+        <footer>
+            <p>Nurturing Competencies. Building the Future.</p>
+        </footer>
+    </div>
+</body>
+</html>

@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Greenfields Secondary School Report Card</title>
+    <link rel="stylesheet" href="/static/schools/css/modern_report_card.css">
+</head>
+<body>
+    <div class="report-card">
+        <!-- Top Header -->
+        <header class="header">
+            <div class="header-left">
+                <img src="/media/school_logo.png" alt="School Logo" class="school-logo">
+            </div>
+            <div class="header-center">
+                <h1>GREENFIELDS SECONDARY SCHOOL</h1>
+                <p>P.O. Box 256, Entebbe, Uganda</p>
+                <p>+256 700 123456 | +256 776 987654</p>
+                <p>info@greenfields.sc.ug | www.greenfields.sc.ug</p>
+            </div>
+            <div class="header-right">
+                <h2>NEW CURRICULUM REPORT CARD</h2>
+                <p>Competency Based Assessment</p>
+                <p>Term 2 | 2024</p>
+            </div>
+        </header>
+
+        <!-- Main Layout -->
+        <main class="main-layout">
+            <!-- Left Column -->
+            <div class="column left-column">
+                <div class="student-info">
+                    <img src="/media/student_photo.png" alt="Student Photo" class="student-photo">
+                    <p><strong>Name:</strong> {{ student.name }}</p>
+                    <p><strong>Admission No.:</strong> {{ student.admission_no }}</p>
+                    <p><strong>Index No.:</strong> {{ student.index_no }}</p>
+                    <p><strong>Class:</strong> {{ student.class }}</p>
+                    <p><strong>Stream:</strong> {{ student.stream }}</p>
+                    <p><strong>Age:</strong> {{ student.age }}</p>
+                    <p><strong>Gender:</strong> {{ student.gender }}</p>
+                </div>
+                <div class="academic-info">
+                    <div class="card">
+                        <p><strong>Academic Year:</strong> 2024</p>
+                    </div>
+                    <div class="card">
+                        <p><strong>Term:</strong> 2</p>
+                    </div>
+                    <div class="card">
+                        <p><strong>Report Issue Date:</strong> 25th May 2024</p>
+                    </div>
+                    <div class="card">
+                        <p><strong>Next Term Begins:</strong> 5th Aug 2024</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Center Column -->
+            <div class="column center-column">
+                <div class="subject-performance">
+                    <h2>Subject Performance</h2>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Subject</th>
+                                <th>Average Score (%)</th>
+                                <th>Grade</th>
+                                <th>Remark</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for subject in subjects %}
+                            <tr>
+                                <td>{{ subject.name }}</td>
+                                <td>{{ subject.average_score }}</td>
+                                <td class="grade {{ subject.grade|lower }}">{{ subject.grade }}</td>
+                                <td>{{ subject.remark }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="summary">
+                    <p><strong>Overall Average:</strong> {{ overall_average }}%</p>
+                    <p><strong>Overall Grade:</strong> <span class="grade {{ overall_grade|lower }}">{{ overall_grade }}</span></p>
+                    <p><strong>Position in Class:</strong> {{ position_in_class }}</p>
+                </div>
+                <div class="grade-key">
+                    <p><strong>Grade Key:</strong> A (80-100), B (70-79), C (60-69), D (50-59), E (Below 50)</p>
+                </div>
+            </div>
+
+            <!-- Right Column -->
+            <div class="column right-column">
+                <div class="competency-breakdown">
+                    <h2>Competency Breakdown</h2>
+                    <table class="table">
+                        <thead>
+                            <tr>
+                                <th>Subject</th>
+                                <th>Knowledge</th>
+                                <th>Skills</th>
+                                <th>Values</th>
+                                <th>Average</th>
+                                <th>Grade</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for competency in competencies %}
+                            <tr>
+                                <td>{{ competency.subject }}</td>
+                                <td>{{ competency.knowledge }}</td>
+                                <td>{{ competency.skills }}</td>
+                                <td>{{ competency.values }}</td>
+                                <td>{{ competency.average }}</td>
+                                <td class="grade {{ competency.grade|lower }}">{{ competency.grade }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="learner-profile">
+                    <h2>Learner Profile</h2>
+                    <ul>
+                        <li>Critical Thinking: ●●●●○</li>
+                        <li>Creativity: ●●●●●</li>
+                        <li>Collaboration: ●●●○○</li>
+                        <li>Self-management: ●●●●○</li>
+                        <li>Learning to Learn: ●●●●●</li>
+                    </ul>
+                </div>
+                <div class="attendance">
+                    <h2>Attendance</h2>
+                    <p><strong>Days Present:</strong> {{ attendance.present }}</p>
+                    <p><strong>Days Absent:</strong> {{ attendance.absent }}</p>
+                    <p><strong>Attendance Percentage:</strong> {{ attendance.percentage }}%</p>
+                </div>
+                <div class="conduct">
+                    <h2>Conduct</h2>
+                    <p>😊 Good</p>
+                </div>
+            </div>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="teacher-remark">
+                <h2>Teacher's Remark</h2>
+                <p>{{ teacher_remark }}</p>
+            </div>
+            <div class="signatures">
+                <p><strong>Class Teacher:</strong> ___________________________</p>
+                <p><strong>Head Teacher:</strong> ___________________________</p>
+                <p><strong>School Stamp:</strong> [Stamp Here]</p>
+            </div>
+            <p class="note">This report is generated electronically and does not require a signature.</p>
+        </footer>
+    </div>
+</body>
+</html>

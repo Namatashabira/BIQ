@@ -46,6 +46,15 @@ urlpatterns = [
 
     # Plans & Subscriptions
     path('api/plans/', include('plans.urls')),
+
+    # Students management
+    path('api/school/', include('students.urls')),
+
+    # Fees management
+    path('api/fees/', include('fees.urls')),
+
+    # Schools: marks entry, report cards
+    path('schools/', include('schools.urls')),
 ]
 
 # Serve media files in development

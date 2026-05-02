@@ -36,6 +36,8 @@ INSTALLED_APPS = [
     "forecast",
     "business_reports",
     "plans",
+    "students",
+    "fees",
 ]
 
 # Add Cloudinary apps only if the package is installed

@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fees Page</title>
+    <link rel="stylesheet" href="/static/schools/css/fees_page.css">
+</head>
+<body>
+    <div class="fees-page">
+        <header class="header">
+            <h1>Fees Management</h1>
+        </header>
+
+        <nav class="tabs">
+            <button class="tab-button active" onclick="openTab(event, 'overview')">Overview</button>
+            <button class="tab-button" onclick="openTab(event, 'payments')">Payments</button>
+            <button class="tab-button" onclick="openTab(event, 'fee-structure')">Fee Structure</button>
+        </nav>
+
+        <div class="tab-content">
+            <div id="overview" class="tab-pane active">
+                <h2>Overview</h2>
+                <p>Summary of fees and payment status.</p>
+                <!-- Add overview content here -->
+            </div>
+
+            <div id="payments" class="tab-pane">
+                <h2>Payments</h2>
+                <p>Details of payments made and pending payments.</p>
+                <!-- Add payments content here -->
+            </div>
+
+            <div id="fee-structure" class="tab-pane">
+                <h2>Fee Structure</h2>
+                <p>Details of the fee structure for the academic year.</p>
+                <!-- Add fee structure content here -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        function openTab(event, tabName) {
+            const tabPanes = document.querySelectorAll('.tab-pane');
+            const tabButtons = document.querySelectorAll('.tab-button');
+
+            tabPanes.forEach(pane => pane.classList.remove('active'));
+            tabButtons.forEach(button => button.classList.remove('active'));
+
+            document.getElementById(tabName).classList.add('active');
+            event.currentTarget.classList.add('active');
+        }
+    </script>
+</body>
+</html>
