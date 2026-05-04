@@ -1,6 +1,12 @@
 from rest_framework import serializers
 from .models import Student, Stream, Guardian, StudentHistory, StudentMark, GeneratedReport
 
+try:
+    import cloudinary
+    _cloudinary_available = True
+except ImportError:
+    _cloudinary_available = False
+
 
 class StreamSerializer(serializers.ModelSerializer):
     class Meta:
@@ -49,10 +55,24 @@ class StudentSerializer(serializers.ModelSerializer):
     guardians = GuardianSerializer(many=True, read_only=True)
     history = StudentHistorySerializer(many=True, read_only=True)
     stream_name = serializers.CharField(source='stream.name', read_only=True)
+    photo = serializers.SerializerMethodField()
 
     class Meta:
         model = Student
         fields = '__all__'
+
+    def get_photo(self, obj):
+        if not obj.photo:
+            return None
+        if _cloudinary_available:
+            try:
+                return obj.photo.url
+            except Exception:
+                pass
+        request = self.context.get('request')
+        if request:
+            return request.build_absolute_uri(obj.photo.url)
+        return obj.photo.url
 
     def validate_admission_number(self, value):
         return value if value and value.strip() else None

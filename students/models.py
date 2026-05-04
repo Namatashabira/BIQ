@@ -1,4 +1,9 @@
 from django.db import models
+try:
+    from cloudinary.models import CloudinaryField
+    _cloudinary_available = True
+except ImportError:
+    _cloudinary_available = False
 
 CLASS_CHOICES = [
     ('S.1', 'S.1'), ('S.2', 'S.2'), ('S.3', 'S.3'),
@@ -31,7 +36,7 @@ class Student(models.Model):
     stream = models.ForeignKey(Stream, on_delete=models.SET_NULL, null=True, blank=True, related_name='students')
     email = models.EmailField(blank=True, null=True)
     phone = models.CharField(max_length=20, blank=True)
-    photo = models.ImageField(upload_to='student_photos/', blank=True, null=True)
+    photo = CloudinaryField('photo', folder='student_photos', blank=True, null=True) if _cloudinary_available else models.ImageField(upload_to='student_photos/', blank=True, null=True)
     # Location Info
     district = models.CharField(max_length=100, blank=True)
     home_address = models.CharField(max_length=200, blank=True)
