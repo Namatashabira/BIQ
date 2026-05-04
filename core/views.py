@@ -304,9 +304,23 @@ class BusinessSettingsView(APIView):
     """
     permission_classes = [AllowAny]
 
+    def _resolve_tenant(self, request):
+        user = request.user
+        if not user or not user.is_authenticated:
+            return None
+        tenant = getattr(user, 'tenant', None)
+        if not tenant:
+            from tenants.models import TenantMembership
+            membership = TenantMembership.objects.filter(user=user).first()
+            tenant = membership.tenant if membership else None
+        if not tenant:
+            tenant = Tenant.objects.filter(admin=user).first()
+        return tenant
+
     def get(self, request):
         logger.info(f"GET /api/business-settings/ - IP: {request.META.get('REMOTE_ADDR')}")
-        settings = BusinessSettings.get_settings()
+        tenant = self._resolve_tenant(request)
+        settings = BusinessSettings.get_settings(tenant)
         
         data = {
             'businessName': settings.business_name,
@@ -331,7 +345,8 @@ class BusinessSettingsView(APIView):
         logger.info(f"Request data: {request.data}")
         
         data = request.data
-        settings = BusinessSettings.get_settings()
+        tenant = self._resolve_tenant(request)
+        settings = BusinessSettings.get_settings(tenant)
         
         # Update fields
         settings.business_name = data.get('businessName', settings.business_name)
@@ -352,14 +367,6 @@ class BusinessSettingsView(APIView):
         # Also update the current user's tenant BusinessConfig if business_type changed
         if 'businessType' in data and data['businessType']:
             try:
-                # Get current user's tenant
-                user = request.user
-                tenant = getattr(user, 'tenant', None)
-                if not tenant:
-                    from tenants.models import TenantMembership
-                    membership = TenantMembership.objects.filter(user=user).first()
-                    tenant = membership.tenant if membership else None
-                
                 if tenant:
                     business_config, created = BusinessConfig.objects.get_or_create(
                         tenant=tenant,

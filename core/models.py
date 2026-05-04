@@ -127,6 +127,7 @@ class PasswordResetToken(models.Model):
 
 class BusinessSettings(models.Model):
     """Model to store business information for receipts and invoices"""
+    tenant = models.OneToOneField('tenants.Tenant', on_delete=models.CASCADE, related_name='business_settings', null=True, blank=True)
     business_name = models.CharField(max_length=200)
     business_type = models.CharField(max_length=100, blank=True)
     phone = models.CharField(max_length=20)
@@ -147,11 +148,24 @@ class BusinessSettings(models.Model):
         verbose_name_plural = 'Business Settings'
 
     def __str__(self):
-        return self.business_name
+        return f"{self.business_name} ({self.tenant.name if self.tenant else 'No Tenant'})"
 
     @classmethod
-    def get_settings(cls):
-        """Get or create the single business settings instance"""
+    def get_settings(cls, tenant=None):
+        """Get or create business settings for a specific tenant"""
+        if tenant:
+            settings, _ = cls.objects.get_or_create(
+                tenant=tenant,
+                defaults={
+                    'business_name': tenant.name or 'Your Business Name',
+                    'phone': '',
+                    'location': '',
+                    'district': '',
+                    'town': ''
+                }
+            )
+            return settings
+        # Fallback for legacy code without tenant
         return cls.objects.first() or cls.objects.create(
             business_name='Your Business Name',
             phone='',
