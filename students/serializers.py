@@ -1,5 +1,6 @@
 from rest_framework import serializers
 from .models import Student, Stream, Guardian, StudentHistory, StudentMark, GeneratedReport
+import os
 
 try:
     import cloudinary
@@ -75,8 +76,7 @@ class StudentSerializer(serializers.ModelSerializer):
             # Relative URL — make absolute
             request = self.context.get('request')
             if request:
-                return request.build_absolute_uri(url)
-            return url
+                return value if value else None
         except Exception:
             return None
 
@@ -96,10 +96,15 @@ class StudentSerializer(serializers.ModelSerializer):
                 instance.save(update_fields=['photo'])
                 return
             except Exception as e:
-                # Fall through to local storage on Cloudinary failure
                 import logging
-                logging.getLogger(__name__).warning(f"Cloudinary upload failed: {e}")
-        # Local storage fallback
+                logging.getLogger(__name__).error(f"Cloudinary upload failed: {e}")
+                if os.getenv('DJANGO_ENV') == 'production':
+                    raise RuntimeError("Failed to upload photo to Cloudinary")
+        else:
+            if os.getenv('DJANGO_ENV') == 'production':
+                raise RuntimeError("Cloudinary is not available in production")
+
+        # Local storage fallback (only for development)
         instance.photo = photo_file
         instance.save(update_fields=['photo'])
 

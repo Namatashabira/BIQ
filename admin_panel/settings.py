@@ -160,7 +160,7 @@ CSRF_TRUSTED_ORIGINS = [
     "https://web.railway.internal",
     "https://namatashabira.github.io",
 ]
-CORS_ALLOW_ALL_ORIGINS = True  # Temporarily allow all origins for testing
+CORS_ALLOW_ALL_ORIGINS = os.getenv('CORS_ALLOW_ALL_ORIGINS', 'False') == 'True'
 CORS_ALLOW_HEADERS = [
     'accept',
     'accept-encoding',

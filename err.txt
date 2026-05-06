@@ -1,0 +1,17 @@
+Traceback (most recent call last):
+  File "<string>", line 1, in <module>
+    import cloudinary, cloudinary.api; cloudinary.config(cloud_name='biq', api_key='123555233346492', api_secret='qwsNjZMX8Ta_dplHNt9gyaLgumo', secure=True); print(cloudinary.api.ping())
+                                                                                                                                                                    ~~~~~~~~~~~~~~~~~~~^^
+  File "C:\Users\ssema\AppData\Local\Programs\Python\Python313\Lib\site-packages\cloudinary\api.py", line 40, in ping
+    return call_json_api("get", ["ping"], {}, **options)
+  File "C:\Users\ssema\AppData\Local\Programs\Python\Python313\Lib\site-packages\cloudinary\api_client\call_api.py", line 43, in call_json_api
+    return _call_api(method, uri, params=params, body=data, headers={'Content-Type': 'application/json'}, **options)
+  File "C:\Users\ssema\AppData\Local\Programs\Python\Python313\Lib\site-packages\cloudinary\api_client\call_api.py", line 77, in _call_api
+    return execute_request(http_connector=_http,
+                           method=method,
+    ...<3 lines>...
+                           api_url=api_url,
+                           **options)
+  File "C:\Users\ssema\AppData\Local\Programs\Python\Python313\Lib\site-packages\cloudinary\api_client\execute_request.py", line 90, in execute_request
+    raise exception_class("Error {0} - {1}".format(response.status, result["error"]["message"]))
+cloudinary.exceptions.AuthorizationRequired: Error 401 - cloud_name mismatch
