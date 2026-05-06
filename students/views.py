@@ -20,6 +20,29 @@ class StudentViewSet(viewsets.ModelViewSet):
         context['request'] = self.request
         return context
 
+    def _inject_photo(self, request):
+        """Remap 'photo' file from request.FILES into data as 'photo_upload'."""
+        data = request.data.copy()
+        if 'photo' in request.FILES:
+            data['photo_upload'] = request.FILES['photo']
+        return data
+
+    def create(self, request, *args, **kwargs):
+        data = self._inject_photo(request)
+        serializer = self.get_serializer(data=data)
+        serializer.is_valid(raise_exception=True)
+        self.perform_create(serializer)
+        return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', False)
+        instance = self.get_object()
+        data = self._inject_photo(request)
+        serializer = self.get_serializer(instance, data=data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(serializer.data)
+
     @action(detail=False, methods=['get'], url_path='meta')
     def meta(self, request):
         return Response({

@@ -3,6 +3,7 @@ from .models import Student, Stream, Guardian, StudentHistory, StudentMark, Gene
 
 try:
     import cloudinary
+    import cloudinary.uploader
     _cloudinary_available = True
 except ImportError:
     _cloudinary_available = False
@@ -55,7 +56,10 @@ class StudentSerializer(serializers.ModelSerializer):
     guardians = GuardianSerializer(many=True, read_only=True)
     history = StudentHistorySerializer(many=True, read_only=True)
     stream_name = serializers.CharField(source='stream.name', read_only=True)
+    # Read-only: returns resolved URL
     photo = serializers.SerializerMethodField()
+    # Write-only: accepts uploaded file
+    photo_upload = serializers.ImageField(write_only=True, required=False, allow_null=True)
 
     class Meta:
         model = Student
@@ -64,24 +68,54 @@ class StudentSerializer(serializers.ModelSerializer):
     def get_photo(self, obj):
         if not obj.photo:
             return None
+        try:
+            url = obj.photo.url
+            if url and (url.startswith('http://') or url.startswith('https://')):
+                return url
+            # Relative URL — make absolute
+            request = self.context.get('request')
+            if request:
+                return request.build_absolute_uri(url)
+            return url
+        except Exception:
+            return None
+
+    def _save_photo(self, instance, photo_file):
+        """Upload photo to Cloudinary or local storage and save on instance."""
         if _cloudinary_available:
             try:
-                url = obj.photo.url
-                # Cloudinary URLs are always absolute
-                if url and (url.startswith('http://') or url.startswith('https://')):
-                    return url
-                # Fallback: build absolute URL
-                request = self.context.get('request')
-                if request:
-                    return request.build_absolute_uri(url)
-                return url
-            except Exception:
-                pass
-        # Local file storage
-        request = self.context.get('request')
-        if request and hasattr(obj.photo, 'url'):
-            return request.build_absolute_uri(obj.photo.url)
-        return obj.photo.url if hasattr(obj.photo, 'url') else None
+                result = cloudinary.uploader.upload(
+                    photo_file,
+                    folder='student_photos',
+                    public_id=f"student_{instance.id}",
+                    overwrite=True,
+                    resource_type='image',
+                )
+                # Store the Cloudinary public_id so CloudinaryField works correctly
+                instance.photo = result.get('public_id') or result.get('secure_url')
+                instance.save(update_fields=['photo'])
+                return
+            except Exception as e:
+                # Fall through to local storage on Cloudinary failure
+                import logging
+                logging.getLogger(__name__).warning(f"Cloudinary upload failed: {e}")
+        # Local storage fallback
+        instance.photo = photo_file
+        instance.save(update_fields=['photo'])
+
+    def create(self, validated_data):
+        photo_file = validated_data.pop('photo_upload', None)
+        student = super().create(validated_data)
+        if photo_file:
+            self._save_photo(student, photo_file)
+        return student
+
+    def update(self, instance, validated_data):
+        photo_file = validated_data.pop('photo_upload', None)
+        student = super().update(instance, validated_data)
+        if photo_file:
+            self._save_photo(student, photo_file)
+        return student
 
     def validate_admission_number(self, value):
         return value if value and value.strip() else None
