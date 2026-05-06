@@ -13,11 +13,12 @@ CLASS_CHOICES = [
 
 class Stream(models.Model):
     """User-customisable streams, optionally scoped to a class label."""
+    tenant = models.ForeignKey('tenants.Tenant', on_delete=models.CASCADE, null=True, blank=True, related_name='streams', db_index=True)
     name = models.CharField(max_length=50)
     class_label = models.CharField(max_length=10, choices=CLASS_CHOICES, blank=True)
 
     class Meta:
-        unique_together = ('name', 'class_label')
+        unique_together = ('tenant', 'name', 'class_label')
 
     def __str__(self):
         return f"{self.name} ({self.class_label})" if self.class_label else self.name
@@ -26,11 +27,12 @@ class Stream(models.Model):
 class Student(models.Model):
     GENDER_CHOICES = [('male', 'Male'), ('female', 'Female'), ('other', 'Other')]
 
+    tenant = models.ForeignKey('tenants.Tenant', on_delete=models.CASCADE, null=True, blank=True, related_name='school_students', db_index=True)
     first_name = models.CharField(max_length=50)
     last_name = models.CharField(max_length=50)
     date_of_birth = models.DateField(null=True, blank=True)
     gender = models.CharField(max_length=10, choices=GENDER_CHOICES, blank=True)
-    admission_number = models.CharField(max_length=30, unique=True, blank=True, null=True, default=None)
+    admission_number = models.CharField(max_length=30, blank=True, null=True, default=None)
     index_number = models.CharField(max_length=30, blank=True, null=True, help_text='Exam index number (S.4 / S.6 only)')
     class_assigned = models.CharField(max_length=10, choices=CLASS_CHOICES, blank=True)
     stream = models.ForeignKey(Stream, on_delete=models.SET_NULL, null=True, blank=True, related_name='students')
@@ -54,6 +56,16 @@ class Student(models.Model):
         ('paid', 'Paid'), ('partial', 'Partial'), ('not_paid', 'Not Paid'),
     ], default='not_paid', blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        # admission_number unique per tenant
+        constraints = [
+            models.UniqueConstraint(
+                fields=['tenant', 'admission_number'],
+                condition=models.Q(admission_number__isnull=False),
+                name='unique_admission_per_tenant'
+            )
+        ]
 
     def __str__(self):
         return f"{self.first_name} {self.last_name}"
@@ -90,6 +102,7 @@ class StudentHistory(models.Model):
 class GeneratedReport(models.Model):
     """Stores a generated report card snapshot per student per term."""
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='reports')
+    tenant = models.ForeignKey('tenants.Tenant', on_delete=models.CASCADE, null=True, blank=True, db_index=True)
     term = models.CharField(max_length=20)
     academic_year = models.CharField(max_length=20)
     template = models.CharField(max_length=20, default='modern')
@@ -107,6 +120,7 @@ class GeneratedReport(models.Model):
 class StudentMark(models.Model):
     """Stores CA + Exam marks per student per subject per term."""
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='marks')
+    tenant = models.ForeignKey('tenants.Tenant', on_delete=models.CASCADE, null=True, blank=True, db_index=True)
     subject = models.CharField(max_length=100)
     competency = models.CharField(max_length=200, blank=True)
     term = models.CharField(max_length=20)          # e.g. Term 1

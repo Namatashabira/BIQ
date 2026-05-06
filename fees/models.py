@@ -24,6 +24,7 @@ PAYMENT_CATEGORY_CHOICES = [
 
 class FeeStructure(models.Model):
     """Defines how much each class owes per term/year."""
+    tenant = models.ForeignKey('tenants.Tenant', on_delete=models.CASCADE, null=True, blank=True, related_name='fee_structures', db_index=True)
     class_assigned = models.CharField(max_length=10, choices=CLASS_CHOICES)
     term = models.CharField(max_length=20, choices=TERM_CHOICES)
     academic_year = models.CharField(max_length=20)
@@ -33,7 +34,7 @@ class FeeStructure(models.Model):
     updated_at = models.DateTimeField(auto_now=True)
 
     class Meta:
-        unique_together = ('class_assigned', 'term', 'academic_year')
+        unique_together = ('tenant', 'class_assigned', 'term', 'academic_year')
         ordering = ['academic_year', 'term', 'class_assigned']
 
     def __str__(self):
@@ -42,6 +43,7 @@ class FeeStructure(models.Model):
 
 class FeePayment(models.Model):
     """Records a single fee payment made by/for a student."""
+    tenant = models.ForeignKey('tenants.Tenant', on_delete=models.CASCADE, null=True, blank=True, related_name='fee_payments', db_index=True)
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='fee_payments')
     term = models.CharField(max_length=20, choices=TERM_CHOICES)
     academic_year = models.CharField(max_length=20)

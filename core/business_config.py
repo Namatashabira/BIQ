@@ -105,17 +105,15 @@ class BusinessConfig(models.Model):
     def __str__(self):
         return f"{self.tenant.name} - {self.get_business_type_display()}"
     
-    def apply_business_preset(self):
+    def apply_business_preset(self, force=False):
         """
         Apply default feature toggles and terminology based on business type.
-        This is called ONCE during onboarding.
+        Called once during onboarding. Pass force=True to re-apply.
         """
-        if self.preset_applied:
+        if self.preset_applied and not force:
             return
-        
-        preset = BUSINESS_PRESETS.get(self.business_type)
-        if not preset:
-            preset = BUSINESS_PRESETS['other']
+
+        preset = BUSINESS_PRESETS.get(self.business_type, BUSINESS_PRESETS['other'])
         
         # Apply feature toggles (merge defaults with preset overrides)
         merged_features = {**FEATURE_DEFAULTS, **preset['features']}

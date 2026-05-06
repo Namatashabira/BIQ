@@ -48,16 +48,22 @@ def ensure_tenant_for_user(user, business_name=None, business_type='other'):
         if not getattr(tenant, 'is_verified', False):
             tenant.is_verified = True
             tenant.save(update_fields=['is_verified'])
+        # Use the tenant's actual business_type, not the default 'other'
+        business_type = tenant.business_type or business_type
 
     # Ensure membership exists
     TenantMembership.objects.get_or_create(user=user, tenant=tenant, defaults={'role': 'admin'})
 
     # Ensure business config exists (skip gracefully if table not ready)
     try:
-        BusinessConfig.objects.get_or_create(
+        config, created = BusinessConfig.objects.get_or_create(
             tenant=tenant,
             defaults={'business_type': business_type, 'onboarding_completed': True},
         )
+        # If config exists but business_type is wrong (e.g. 'other' from a bad bootstrap), fix it
+        if not created and config.business_type == 'other' and business_type != 'other':
+            config.business_type = business_type
+            config.save(update_fields=['business_type'])
     except (ProgrammingError, OperationalError):
         logger.warning("BusinessConfig table missing; skipping config bootstrap")
 

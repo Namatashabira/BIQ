@@ -2,18 +2,48 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
+from rest_framework.permissions import IsAuthenticated
 from .models import Student, Stream, Guardian, StudentHistory, StudentMark, GeneratedReport, CLASS_CHOICES
 from .serializers import (
     StudentSerializer, StreamSerializer,
     GuardianSerializer, StudentHistorySerializer, StudentMarkSerializer,
     GeneratedReportSerializer,
 )
+from core.tenant_utils import get_tenant_for_user
 
 
-class StudentViewSet(viewsets.ModelViewSet):
-    queryset = Student.objects.select_related('stream').prefetch_related('guardians', 'history').all()
+class TenantScopedMixin:
+    """Mixin that scopes all querysets to the current user's tenant."""
+    permission_classes = [IsAuthenticated]
+
+    def get_tenant(self):
+        return get_tenant_for_user(self.request.user)
+
+    def perform_create(self, serializer):
+        serializer.save(tenant=self.get_tenant())
+
+
+class StudentViewSet(TenantScopedMixin, viewsets.ModelViewSet):
     serializer_class = StudentSerializer
     parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    def get_queryset(self):
+        tenant = self.get_tenant()
+        qs = Student.objects.select_related('stream').prefetch_related('guardians', 'history')
+        if tenant:
+            qs = qs.filter(tenant=tenant)
+        else:
+            qs = qs.none()
+        search = self.request.query_params.get('search', '')
+        if search:
+            from django.db.models import Q
+            qs = qs.filter(
+                Q(first_name__icontains=search) |
+                Q(last_name__icontains=search) |
+                Q(admission_number__icontains=search) |
+                Q(index_number__icontains=search)
+            )
+        return qs
 
     def get_serializer_context(self):
         context = super().get_serializer_context()
@@ -21,7 +51,6 @@ class StudentViewSet(viewsets.ModelViewSet):
         return context
 
     def _inject_photo(self, request):
-        """Remap 'photo' file from request.FILES into data as 'photo_upload'."""
         data = request.data.copy()
         if 'photo' in request.FILES:
             data['photo_upload'] = request.FILES['photo']
@@ -31,7 +60,7 @@ class StudentViewSet(viewsets.ModelViewSet):
         data = self._inject_photo(request)
         serializer = self.get_serializer(data=data)
         serializer.is_valid(raise_exception=True)
-        self.perform_create(serializer)
+        serializer.save(tenant=self.get_tenant())
         return Response(serializer.data, status=status.HTTP_201_CREATED)
 
     def update(self, request, *args, **kwargs):
@@ -40,14 +69,16 @@ class StudentViewSet(viewsets.ModelViewSet):
         data = self._inject_photo(request)
         serializer = self.get_serializer(instance, data=data, partial=partial)
         serializer.is_valid(raise_exception=True)
-        self.perform_update(serializer)
+        serializer.save()
         return Response(serializer.data)
 
     @action(detail=False, methods=['get'], url_path='meta')
     def meta(self, request):
+        tenant = self.get_tenant()
+        streams_qs = Stream.objects.filter(tenant=tenant) if tenant else Stream.objects.none()
         return Response({
             'classes': [{'value': v, 'label': l} for v, l in CLASS_CHOICES],
-            'streams': StreamSerializer(Stream.objects.all(), many=True).data,
+            'streams': StreamSerializer(streams_qs, many=True).data,
         })
 
     @action(detail=True, methods=['get', 'post'], url_path='guardians')
@@ -72,10 +103,6 @@ class StudentViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['get'], url_path='report')
     def report(self, request, pk=None):
-        """
-        Generate a simple report from StudentHistory performance records.
-        Query params: term (optional), academic_year (optional)
-        """
         student = self.get_object()
         term = request.query_params.get('term', '')
         academic_year = request.query_params.get('academic_year', '')
@@ -86,36 +113,18 @@ class StudentViewSet(viewsets.ModelViewSet):
         if academic_year:
             qs = qs.filter(date__year=academic_year)
 
-        records = list(qs.order_by('-date'))
+        subjects = [{
+            'subject_name': r.title,
+            'subject_code': r.title[:6].upper(),
+            'score': 0, 'grade': '—',
+            'remark': r.description or '',
+            'date': str(r.date),
+            'competencies': [],
+        } for r in qs.order_by('-date')]
 
-        subjects = []
-        for r in records:
-            subjects.append({
-                'subject_name': r.title,
-                'subject_code': r.title[:6].upper(),
-                'score': 0,
-                'grade': '—',
-                'remark': r.description or '',
-                'date': str(r.date),
-                'competencies': [],
-            })
-
-        # Attendance summary
-        attendance = list(student.history.filter(history_type='attendance').order_by('-date').values(
-            'title', 'description', 'date'
-        ))
-
-        # Notes
-        notes = list(student.history.filter(history_type='note').order_by('-date').values(
-            'title', 'description', 'date'
-        ))
-
-        guardians = [{
-            'full_name': g.full_name,
-            'relationship': g.relationship,
-            'phone': g.phone,
-            'email': g.email or '',
-        } for g in student.guardians.all()]
+        attendance = list(student.history.filter(history_type='attendance').order_by('-date').values('title', 'description', 'date'))
+        notes = list(student.history.filter(history_type='note').order_by('-date').values('title', 'description', 'date'))
+        guardians = [{'full_name': g.full_name, 'relationship': g.relationship, 'phone': g.phone, 'email': g.email or ''} for g in student.guardians.all()]
 
         return Response({
             'student': {
@@ -138,38 +147,45 @@ class StudentViewSet(viewsets.ModelViewSet):
             'attendance': attendance,
             'notes': notes,
             'overall': {
-                'total_records': len(records),
+                'total_records': len(subjects),
                 'teacher_comment': f'Report generated for {student.first_name} {student.last_name}.'
                                    + (f' Term: {term}.' if term else '')
                                    + (f' Year: {academic_year}.' if academic_year else ''),
             },
-            'metadata': {
-                'term': term or 'All Terms',
-                'academic_year': academic_year or 'All Years',
-            },
+            'metadata': {'term': term or 'All Terms', 'academic_year': academic_year or 'All Years'},
         })
 
 
-class StreamViewSet(viewsets.ModelViewSet):
-    queryset = Stream.objects.all()
+class StreamViewSet(TenantScopedMixin, viewsets.ModelViewSet):
     serializer_class = StreamSerializer
 
+    def get_queryset(self):
+        tenant = self.get_tenant()
+        return Stream.objects.filter(tenant=tenant) if tenant else Stream.objects.none()
 
-class GuardianViewSet(viewsets.ModelViewSet):
-    queryset = Guardian.objects.all()
+
+class GuardianViewSet(TenantScopedMixin, viewsets.ModelViewSet):
     serializer_class = GuardianSerializer
 
+    def get_queryset(self):
+        tenant = self.get_tenant()
+        return Guardian.objects.filter(student__tenant=tenant) if tenant else Guardian.objects.none()
 
-class StudentHistoryViewSet(viewsets.ModelViewSet):
-    queryset = StudentHistory.objects.all()
+
+class StudentHistoryViewSet(TenantScopedMixin, viewsets.ModelViewSet):
     serializer_class = StudentHistorySerializer
 
+    def get_queryset(self):
+        tenant = self.get_tenant()
+        return StudentHistory.objects.filter(student__tenant=tenant) if tenant else StudentHistory.objects.none()
 
-class StudentMarkViewSet(viewsets.ModelViewSet):
+
+class StudentMarkViewSet(TenantScopedMixin, viewsets.ModelViewSet):
     serializer_class = StudentMarkSerializer
 
     def get_queryset(self):
-        qs = StudentMark.objects.select_related('student').all()
+        tenant = self.get_tenant()
+        qs = StudentMark.objects.select_related('student').filter(tenant=tenant) if tenant else StudentMark.objects.none()
         for param in ('term', 'academic_year', 'subject'):
             val = self.request.query_params.get(param)
             if val:
@@ -182,9 +198,12 @@ class StudentMarkViewSet(viewsets.ModelViewSet):
             qs = qs.filter(student_id=student_id)
         return qs
 
+    def perform_create(self, serializer):
+        serializer.save(tenant=self.get_tenant())
+
     @action(detail=False, methods=['post'], url_path='bulk-save')
     def bulk_save(self, request):
-        """Upsert a list of marks. Each item needs student, subject, term, academic_year."""
+        tenant = self.get_tenant()
         items = request.data if isinstance(request.data, list) else request.data.get('marks', [])
         saved, errors = [], []
         for item in items:
@@ -198,6 +217,7 @@ class StudentMarkViewSet(viewsets.ModelViewSet):
                 'ca_score': item.get('ca_score'),
                 'exam_score': item.get('exam_score'),
                 'competency': item.get('competency', ''),
+                'tenant': tenant,
             }
             try:
                 obj, _ = StudentMark.objects.update_or_create(**lookup, defaults=defaults)
@@ -208,12 +228,13 @@ class StudentMarkViewSet(viewsets.ModelViewSet):
                         status=status.HTTP_207_MULTI_STATUS if errors else status.HTTP_200_OK)
 
 
-class GeneratedReportViewSet(viewsets.ModelViewSet):
+class GeneratedReportViewSet(TenantScopedMixin, viewsets.ModelViewSet):
     serializer_class = GeneratedReportSerializer
     http_method_names = ['get', 'post', 'delete', 'head', 'options']
 
     def get_queryset(self):
-        qs = GeneratedReport.objects.select_related('student').all()
+        tenant = self.get_tenant()
+        qs = GeneratedReport.objects.select_related('student').filter(tenant=tenant) if tenant else GeneratedReport.objects.none()
         for param in ('term', 'academic_year', 'template'):
             val = self.request.query_params.get(param)
             if val:
@@ -228,9 +249,7 @@ class GeneratedReportViewSet(viewsets.ModelViewSet):
 
     @action(detail=False, methods=['post'], url_path='bulk-save')
     def bulk_save(self, request):
-        """Upsert multiple report snapshots at once.
-        Payload: list of {student, term, academic_year, template, report_data}
-        """
+        tenant = self.get_tenant()
         items = request.data if isinstance(request.data, list) else []
         saved, errors = [], []
         for item in items:
@@ -242,6 +261,7 @@ class GeneratedReportViewSet(viewsets.ModelViewSet):
                     defaults={
                         'template': item.get('template', 'modern'),
                         'report_data': item['report_data'],
+                        'tenant': tenant,
                     }
                 )
                 saved.append(obj.id)
