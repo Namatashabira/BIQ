@@ -15,6 +15,11 @@ class StudentViewSet(viewsets.ModelViewSet):
     serializer_class = StudentSerializer
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context['request'] = self.request
+        return context
+
     @action(detail=False, methods=['get'], url_path='meta')
     def meta(self, request):
         return Response({

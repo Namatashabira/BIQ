@@ -66,13 +66,22 @@ class StudentSerializer(serializers.ModelSerializer):
             return None
         if _cloudinary_available:
             try:
-                return obj.photo.url
+                url = obj.photo.url
+                # Cloudinary URLs are always absolute
+                if url and (url.startswith('http://') or url.startswith('https://')):
+                    return url
+                # Fallback: build absolute URL
+                request = self.context.get('request')
+                if request:
+                    return request.build_absolute_uri(url)
+                return url
             except Exception:
                 pass
+        # Local file storage
         request = self.context.get('request')
-        if request:
+        if request and hasattr(obj.photo, 'url'):
             return request.build_absolute_uri(obj.photo.url)
-        return obj.photo.url
+        return obj.photo.url if hasattr(obj.photo, 'url') else None
 
     def validate_admission_number(self, value):
         return value if value and value.strip() else None

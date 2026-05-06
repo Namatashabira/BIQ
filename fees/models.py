@@ -1,9 +1,25 @@
 from django.db import models
 from students.models import Student
+from django.contrib.auth import get_user_model
+
+User = get_user_model()
 
 TERM_CHOICES = [('Term 1', 'Term 1'), ('Term 2', 'Term 2'), ('Term 3', 'Term 3')]
 CLASS_CHOICES = [('S.1','S.1'),('S.2','S.2'),('S.3','S.3'),('S.4','S.4'),('S.5','S.5'),('S.6','S.6')]
 PAYMENT_METHOD_CHOICES = [('cash','Cash'),('bank','Bank'),('mobile_money','Mobile Money'),('other','Other')]
+
+PAYMENT_CATEGORY_CHOICES = [
+    ('school_fees', 'School Fees'),
+    ('uneb_registration', 'UNEB Registration'),
+    ('ple_registration', 'PLE Registration'),
+    ('transport', 'Transport'),
+    ('meals', 'Meals / Boarding'),
+    ('uniform', 'Uniform'),
+    ('books', 'Books & Stationery'),
+    ('medical', 'Medical'),
+    ('sports', 'Sports & Activities'),
+    ('other', 'Other'),
+]
 
 
 class FeeStructure(models.Model):
@@ -33,6 +49,8 @@ class FeePayment(models.Model):
     payment_date = models.DateField()
     payment_method = models.CharField(max_length=20, choices=PAYMENT_METHOD_CHOICES, default='cash')
     reference = models.CharField(max_length=100, blank=True)
+    payment_category = models.CharField(max_length=50, choices=PAYMENT_CATEGORY_CHOICES, default='school_fees')
+    custom_category = models.CharField(max_length=100, blank=True, help_text='Used when payment_category is "other"')
     notes = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
 
@@ -41,3 +59,23 @@ class FeePayment(models.Model):
 
     def __str__(self):
         return f"{self.student} — {self.term} {self.academic_year}: UGX {self.amount_paid}"
+
+
+class ReceiptSettings(models.Model):
+    """Stores bursar signature and school stamp settings per user/tenant."""
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='receipt_settings')
+    # Bursar signature
+    sig_mode = models.CharField(max_length=10, default='', blank=True)  # 'image' | 'name' | ''
+    sig_image = models.TextField(blank=True)   # base64 data URL
+    sig_name  = models.CharField(max_length=200, blank=True)
+    sig_label = models.CharField(max_length=100, default='Bursar', blank=True)  # e.g. 'Bursar', 'Headteacher', 'Director'
+    # School stamp
+    stamp_raw = models.TextField(blank=True)   # base64 data URL of original stamp (no date)
+    stamp_offset_x  = models.IntegerField(default=0)
+    stamp_offset_y  = models.IntegerField(default=0)
+    stamp_rotate    = models.IntegerField(default=0)
+    stamp_circular  = models.BooleanField(default=False)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f"ReceiptSettings for {self.user}"

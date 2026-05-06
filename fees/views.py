@@ -1,10 +1,11 @@
 from rest_framework import viewsets, status
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
+from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from django.db.models import Sum
 from students.models import Student
-from .models import FeeStructure, FeePayment
-from .serializers import FeeStructureSerializer, FeePaymentSerializer
+from .models import FeeStructure, FeePayment, ReceiptSettings
+from .serializers import FeeStructureSerializer, FeePaymentSerializer, ReceiptSettingsSerializer
 
 
 class FeeStructureViewSet(viewsets.ModelViewSet):
@@ -136,3 +137,16 @@ class FeePaymentViewSet(viewsets.ModelViewSet):
                 'count_not_paid': sum(1 for r in rows if r['payment_status'] == 'not_paid'),
             }
         })
+
+
+@api_view(['GET', 'POST'])
+@permission_classes([IsAuthenticated])
+def receipt_settings_view(request):
+    obj, _ = ReceiptSettings.objects.get_or_create(user=request.user)
+    if request.method == 'GET':
+        return Response(ReceiptSettingsSerializer(obj).data)
+    serializer = ReceiptSettingsSerializer(obj, data=request.data, partial=True)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(serializer.data)
+    return Response(serializer.errors, status=400)
