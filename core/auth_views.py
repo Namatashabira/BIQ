@@ -232,6 +232,16 @@ def login(request):
         'name': tenant.name
     } if tenant else None
 
+    # Fetch school_role from Worker record if exists
+    school_role = ''
+    try:
+        from tenants.models import Worker
+        w = Worker.objects.filter(user=user, tenant=tenant).first()
+        if w:
+            school_role = w.school_role or ''
+    except Exception:
+        pass
+
     return Response({
         'refresh': str(refresh),
         'access': str(refresh.access_token),
@@ -242,6 +252,7 @@ def login(request):
             'first_name': user.first_name,
             'last_name': user.last_name,
             'role': getattr(user, 'role', 'worker'),
+            'school_role': school_role,
             'is_staff': user.is_staff,
             'is_superuser': user.is_superuser,
             'tenant': tenant_info

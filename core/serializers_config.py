@@ -152,14 +152,13 @@ class PricingSettingsSerializer(serializers.ModelSerializer):
 
 
 class WorkerAccessInviteSerializer(serializers.ModelSerializer):
-    otp = serializers.CharField(source='otp_code', read_only=True)
-
     class Meta:
         model = WorkerAccessInvite
         fields = [
-            'id', 'name', 'email', 'otp', 'otp_expires_at', 'used', 'allowed_pages', 'created_at', 'updated_at'
+            'id', 'name', 'email', 'username', 'school_role',
+            'otp_code', 'otp_expires_at', 'used', 'allowed_pages', 'created_at', 'updated_at'
         ]
-        read_only_fields = ['id', 'otp', 'otp_expires_at', 'used', 'created_at', 'updated_at']
+        read_only_fields = ['id', 'otp_code', 'otp_expires_at', 'used', 'created_at', 'updated_at']
 
 
 class WorkerPageAccessSerializer(serializers.ModelSerializer):

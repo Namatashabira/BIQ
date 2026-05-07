@@ -3,11 +3,11 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.permissions import IsAuthenticated
-from .models import Student, Stream, Guardian, StudentHistory, StudentMark, GeneratedReport, CLASS_CHOICES
+from .models import Student, Stream, Guardian, StudentHistory, StudentMark, GeneratedReport, Attendance, CLASS_CHOICES
 from .serializers import (
     StudentSerializer, StreamSerializer,
     GuardianSerializer, StudentHistorySerializer, StudentMarkSerializer,
-    GeneratedReportSerializer,
+    GeneratedReportSerializer, AttendanceSerializer,
 )
 from core.tenant_utils import get_tenant_for_user
 
@@ -43,6 +43,12 @@ class StudentViewSet(TenantScopedMixin, viewsets.ModelViewSet):
                 Q(admission_number__icontains=search) |
                 Q(index_number__icontains=search)
             )
+        cls = self.request.query_params.get('class_assigned')
+        if cls:
+            qs = qs.filter(class_assigned=cls)
+        status_filter = self.request.query_params.get('status')
+        if status_filter:
+            qs = qs.filter(status=status_filter)
         return qs
 
     def get_serializer_context(self):
@@ -228,9 +234,53 @@ class StudentMarkViewSet(TenantScopedMixin, viewsets.ModelViewSet):
                         status=status.HTTP_207_MULTI_STATUS if errors else status.HTTP_200_OK)
 
 
+class AttendanceViewSet(TenantScopedMixin, viewsets.ModelViewSet):
+    serializer_class = AttendanceSerializer
+
+    def get_queryset(self):
+        tenant = self.get_tenant()
+        qs = Attendance.objects.select_related('student').filter(tenant=tenant) if tenant else Attendance.objects.none()
+        for param in ('date', 'term', 'academic_year'):
+            val = self.request.query_params.get(param)
+            if val:
+                qs = qs.filter(**{param: val})
+        cls = self.request.query_params.get('class_assigned')
+        if cls:
+            qs = qs.filter(student__class_assigned=cls)
+        student_id = self.request.query_params.get('student')
+        if student_id:
+            qs = qs.filter(student_id=student_id)
+        return qs
+
+    @action(detail=False, methods=['post'], url_path='bulk-save')
+    def bulk_save(self, request):
+        tenant = self.get_tenant()
+        items = request.data if isinstance(request.data, list) else []
+        saved, errors = [], []
+        for item in items:
+            lookup = {
+                'student_id': item.get('student'),
+                'date':       item.get('date'),
+                'term':       item.get('term'),
+                'academic_year': item.get('academic_year'),
+            }
+            defaults = {
+                'status': item.get('status', 'present'),
+                'note':   item.get('note', ''),
+                'tenant': tenant,
+            }
+            try:
+                obj, _ = Attendance.objects.update_or_create(**lookup, defaults=defaults)
+                saved.append(obj.id)
+            except Exception as e:
+                errors.append({'item': item, 'error': str(e)})
+        return Response(
+            {'saved': len(saved), 'errors': errors},
+            status=status.HTTP_207_MULTI_STATUS if errors else status.HTTP_200_OK
+        )
+
+
 class GeneratedReportViewSet(TenantScopedMixin, viewsets.ModelViewSet):
-    serializer_class = GeneratedReportSerializer
-    http_method_names = ['get', 'post', 'delete', 'head', 'options']
 
     def get_queryset(self):
         tenant = self.get_tenant()

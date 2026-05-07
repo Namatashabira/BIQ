@@ -334,8 +334,18 @@ class BusinessSettingsView(APIView):
             'country': settings.country,
             'taxId': settings.tax_id,
             'registrationNumber': settings.registration_number,
+            'registration_number': settings.registration_number,
             'website': settings.website,
+            'motto': settings.motto,
         }
+        # Attach logo URL from Theme
+        try:
+            from core.business_config import Theme
+            theme = Theme.objects.get(tenant=tenant)
+            if theme.logo:
+                data['businessLogoUrl'] = theme.logo.url
+        except Exception:
+            pass
         
         logger.info(f"Returning business settings for: {settings.business_name}")
         return Response(data)
@@ -359,8 +369,9 @@ class BusinessSettingsView(APIView):
         settings.po_box = data.get('poBox', '')
         settings.country = data.get('country', 'Uganda')
         settings.tax_id = data.get('taxId', '')
-        settings.registration_number = data.get('registrationNumber', '')
+        settings.registration_number = data.get('registrationNumber', data.get('registration_number', ''))
         settings.website = data.get('website', '')
+        settings.motto = data.get('motto', '')
         
         settings.save()
         

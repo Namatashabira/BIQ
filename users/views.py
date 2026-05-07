@@ -175,6 +175,26 @@ class UserProfileRetrieveUpdateView(generics.RetrieveUpdateAPIView):
         return user
 
 
+@api_view(['POST'])
+@permission_classes([IsAuthenticated])
+def upload_profile_picture(request):
+    """Upload profile picture to Cloudinary and save URL."""
+    file = request.FILES.get('profile_picture')
+    if not file:
+        return Response({'error': 'No file provided'}, status=status.HTTP_400_BAD_REQUEST)
+
+    profile, _ = UserProfile.objects.get_or_create(user=request.user)
+    profile.profile_picture = file
+    profile.save(update_fields=['profile_picture'])
+
+    try:
+        url = profile.profile_picture.url
+    except Exception:
+        url = None
+
+    return Response({'profile_picture_url': url}, status=status.HTTP_200_OK)
+
+
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def get_user_profile(request):

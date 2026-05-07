@@ -15,7 +15,7 @@ PAGE_PREFIX_MAP = {
     'payments_enabled': ['/api/core/receipts'],
     'analytics_enabled': ['/api/core/analytics'],
     'ai_insights_enabled': ['/api/core/ai/'],
-    'accounting_enabled': ['/api/accounting'],
+    'accounting_enabled': ['/api/accounting', '/api/school-accounting', '/api/fees'],
     'enrollment_enabled': ['/api/enrollment'],
 }
 

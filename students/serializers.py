@@ -1,5 +1,5 @@
 from rest_framework import serializers
-from .models import Student, Stream, Guardian, StudentHistory, StudentMark, GeneratedReport
+from .models import Student, Stream, Guardian, StudentHistory, StudentMark, GeneratedReport, Attendance
 import os
 
 try:
@@ -36,6 +36,19 @@ class StudentMarkSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = StudentMark
+        fields = '__all__'
+
+    def get_student_name(self, obj):
+        return f"{obj.student.first_name} {obj.student.last_name}"
+
+
+class AttendanceSerializer(serializers.ModelSerializer):
+    student_name = serializers.SerializerMethodField()
+    admission_number = serializers.CharField(source='student.admission_number', read_only=True)
+    class_assigned = serializers.CharField(source='student.class_assigned', read_only=True)
+
+    class Meta:
+        model = Attendance
         fields = '__all__'
 
     def get_student_name(self, obj):

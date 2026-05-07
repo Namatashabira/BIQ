@@ -150,3 +150,29 @@ class StudentMark(models.Model):
 
     def __str__(self):
         return f"{self.student} - {self.subject} ({self.term} {self.academic_year})"
+
+
+class Attendance(models.Model):
+    STATUS_CHOICES = [
+        ('present', 'Present'),
+        ('absent',  'Absent'),
+        ('late',    'Late'),
+        ('excused', 'Excused'),
+    ]
+
+    student      = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='attendance')
+    tenant       = models.ForeignKey('tenants.Tenant', on_delete=models.CASCADE, null=True, blank=True, db_index=True)
+    date         = models.DateField()
+    term         = models.CharField(max_length=20)
+    academic_year= models.CharField(max_length=20)
+    status       = models.CharField(max_length=10, choices=STATUS_CHOICES, default='present')
+    note         = models.CharField(max_length=255, blank=True)
+    created_at   = models.DateTimeField(auto_now_add=True)
+    updated_at   = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('student', 'date', 'term', 'academic_year')
+        ordering = ['-date', 'student__last_name']
+
+    def __str__(self):
+        return f"{self.student} — {self.date} ({self.status})"

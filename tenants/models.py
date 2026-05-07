@@ -53,9 +53,19 @@ class Tenant(models.Model):
 
 
 class Worker(models.Model):
-    tenant = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="workers")
-    pages = models.JSONField(default=dict)
-    fields = models.JSONField(default=dict)
+    SCHOOL_ROLE_CHOICES = [
+        ('teacher',     'Teacher'),
+        ('bursar',      'Bursar'),
+        ('dos',         'Director of Studies (DOS)'),
+        ('deputy',      'Deputy Headteacher'),
+        ('headteacher', 'Headteacher'),
+        ('director',    'Director'),
+    ]
+    tenant      = models.ForeignKey(Tenant, on_delete=models.CASCADE, related_name="workers")
+    user        = models.OneToOneField(User, on_delete=models.CASCADE, related_name="worker_profile", null=True, blank=True)
+    school_role = models.CharField(max_length=20, choices=SCHOOL_ROLE_CHOICES, blank=True, default='')
+    pages       = models.JSONField(default=dict)
+    fields      = models.JSONField(default=dict)
 
     def __str__(self):
         return f"{self.tenant.name} Worker"

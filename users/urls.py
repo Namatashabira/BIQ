@@ -1,5 +1,6 @@
 from django.urls import path
 from . import views
+from .views import upload_profile_picture
 from .public_auth_views import PublicUserRegisterView
 from .public_login_views import PublicUserLoginView
 
@@ -18,6 +19,7 @@ urlpatterns = [
     # Additional profile APIs
     path('profile/get/', views.get_user_profile, name='get-user-profile'),
     path('profile/update/', views.update_user_profile, name='update-user-profile'),
+    path('profile/upload-picture/', upload_profile_picture, name='upload-profile-picture'),
 
     # Connect user to tenant (admin only)
     path('connect/', views.connect_user_to_tenant, name='connect_user_to_tenant'),

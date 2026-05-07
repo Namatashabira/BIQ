@@ -348,7 +348,19 @@ def get_configuration_summary(request):
             access = WorkerPageAccess.objects.get(tenant=tenant, user=user)
             allowed_pages = access.allowed_pages or []
         except WorkerPageAccess.DoesNotExist:
-            allowed_pages = []  # Workers without a record get no pages by default
+            # Fallback: read from Worker.pages if WorkerPageAccess not yet created
+            from tenants.models import Worker
+            try:
+                worker_rec = Worker.objects.get(tenant=tenant, user=user)
+                raw = worker_rec.pages or {}
+                allowed_pages = list(raw.keys()) if isinstance(raw, dict) else list(raw)
+                # Back-fill WorkerPageAccess so future calls are fast
+                if allowed_pages:
+                    WorkerPageAccess.objects.create(
+                        tenant=tenant, user=user, allowed_pages=allowed_pages
+                    )
+            except Worker.DoesNotExist:
+                allowed_pages = []
 
     def first_accessible_path():
         nav_order = [
@@ -445,22 +457,25 @@ class WorkerAccessInviteView(APIView):
         if not tenant:
             return Response({'error': 'User has no tenant'}, status=status.HTTP_400_BAD_REQUEST)
 
-        name = request.data.get('name') or ''
-        email = request.data.get('email') or ''
-        allowed_pages = request.data.get('allowed_pages')
-        # Clamp allowed pages to known keys; allow empty list to mean "no access"
-        allowed_pages = [p for p in (allowed_pages or []) if p in FEATURE_DEFAULTS]
-        if allowed_pages is None:
-            allowed_pages = []
+        name  = (request.data.get('name') or '').strip()
+        email = (request.data.get('email') or '').strip()
+        username = (request.data.get('username') or '').strip()
+        school_role = (request.data.get('school_role') or '').strip()
+        allowed_pages = list(request.data.get('allowed_pages') or [])
 
-        if not name or not email:
-            return Response({'error': 'name and email are required'}, status=status.HTTP_400_BAD_REQUEST)
+        if not name or not email or not username:
+            return Response({'error': 'name, email and username are required'}, status=status.HTTP_400_BAD_REQUEST)
+
+        if User.objects.filter(username=username).exclude(email=email).exists():
+            return Response({'error': 'Username already taken'}, status=status.HTTP_400_BAD_REQUEST)
 
         invite, _ = WorkerAccessInvite.objects.get_or_create(
             tenant=tenant,
             email=email,
             defaults={
                 'name': name,
+                'username': username,
+                'school_role': school_role,
                 'allowed_pages': allowed_pages,
                 'created_by': user,
                 'otp_code': WorkerAccessInvite.generate_otp(),
@@ -469,50 +484,56 @@ class WorkerAccessInviteView(APIView):
         )
 
         invite.name = name
+        invite.username = username
+        invite.school_role = school_role
         invite.allowed_pages = allowed_pages
         invite.created_by = user
         invite.refresh_otp()
         invite.save()
 
         return Response(
-            {
-                'success': True,
-                'invite': WorkerAccessInviteSerializer(invite).data
-            },
+            {'success': True, 'invite': WorkerAccessInviteSerializer(invite).data},
             status=status.HTTP_201_CREATED
         )
 
 
 class WorkerAccessActivateView(APIView):
-    """Allow a worker to redeem an invite and set password using OTP."""
+    """Allow a worker to redeem an invite and set password using username + OTP."""
     permission_classes = [AllowAny]
 
     def post(self, request):
-        email = request.data.get('email') or ''
-        otp = request.data.get('otp') or ''
-        password = request.data.get('password') or ''
+        username = (request.data.get('username') or '').strip()
+        otp      = (request.data.get('otp') or '').strip()
+        password = (request.data.get('password') or '').strip()
 
-        invite = WorkerAccessInvite.objects.filter(email=email, otp_code=otp, used=False).first()
+        # Support lookup by username or email
+        invite = (
+            WorkerAccessInvite.objects.filter(username=username, otp_code=otp, used=False).first()
+            or WorkerAccessInvite.objects.filter(email=username, otp_code=otp, used=False).first()
+        )
         if not invite:
-            return Response({'error': 'Invalid code'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'Invalid username or OTP code'}, status=status.HTTP_400_BAD_REQUEST)
 
         if invite.otp_expires_at < timezone.now():
-            return Response({'error': 'Code expired'}, status=status.HTTP_400_BAD_REQUEST)
+            return Response({'error': 'OTP code has expired'}, status=status.HTTP_400_BAD_REQUEST)
 
         if not password or len(password) < 6:
             return Response({'error': 'Password must be at least 6 characters'}, status=status.HTTP_400_BAD_REQUEST)
 
+        actual_username = invite.username or invite.email.split('@')[0]
         user, created = User.objects.get_or_create(
-            email=email,
+            email=invite.email,
             defaults={
-                'username': email.split('@')[0],
+                'username': actual_username,
+                'first_name': invite.name.split()[0] if invite.name else '',
+                'last_name': ' '.join(invite.name.split()[1:]) if invite.name else '',
                 'tenant': invite.tenant,
-                'role': 'worker'
+                'role': 'worker',
             }
         )
-        # Ensure user belongs to tenant and set password
+        user.username = actual_username
         user.tenant = invite.tenant
-        user.role = getattr(user, 'role', 'worker') or 'worker'
+        user.role = 'worker'
         user.set_password(password)
         user.save()
 
@@ -522,28 +543,53 @@ class WorkerAccessActivateView(APIView):
             defaults={'allowed_pages': invite.allowed_pages}
         )
 
+        # Create/update Worker record with school_role
+        from tenants.models import Worker
+        ROLE_PAGES = {
+            'teacher':     ['marks-entry', 'attendance'],
+            'bursar':      ['fees', 'school-receipt-lookup'],
+            'dos':         ['student-management', 'marks-entry', 'report-templates', 'attendance'],
+            'deputy':      ['student-management', 'marks-entry', 'fees', 'report-templates', 'attendance'],
+            'headteacher': ['dashboard', 'student-management', 'marks-entry', 'fees', 'report-templates', 'attendance', 'analytics'],
+            'director':    ['dashboard', 'student-management', 'marks-entry', 'fees', 'report-templates', 'attendance', 'analytics'],
+        }
+        worker, _ = Worker.objects.get_or_create(tenant=invite.tenant, user=user)
+        if invite.school_role:
+            worker.school_role = invite.school_role
+            worker.pages = {p: True for p in ROLE_PAGES.get(invite.school_role, [])}
+            worker.save()
+
         invite.used = True
         invite.save(update_fields=['used'])
 
-        return Response({'success': True, 'message': 'Account activated. Please log in with your new password.'})
+        return Response({'success': True, 'message': 'Account activated. You can now log in.'})
 
 
 class WorkerAccessCheckOtpView(APIView):
-    """Validate whether a submitted code is a valid, unused OTP for the given email."""
+    """Validate OTP by username and return invite info (name, role) if valid."""
     permission_classes = [AllowAny]
 
     def post(self, request):
-        email = request.data.get('email') or request.data.get('username') or ''
-        otp = request.data.get('otp') or ''
+        username = (request.data.get('username') or request.data.get('email') or '').strip()
+        otp      = (request.data.get('otp') or '').strip()
 
-        invite = WorkerAccessInvite.objects.filter(email=email, otp_code=otp, used=False).first()
+        invite = (
+            WorkerAccessInvite.objects.filter(username=username, otp_code=otp, used=False).first()
+            or WorkerAccessInvite.objects.filter(email=username, otp_code=otp, used=False).first()
+        )
         if not invite:
             return Response({'valid': False, 'reason': 'not_found'}, status=status.HTTP_200_OK)
 
         if invite.otp_expires_at < timezone.now():
             return Response({'valid': False, 'reason': 'expired'}, status=status.HTTP_200_OK)
 
-        return Response({'valid': True}, status=status.HTTP_200_OK)
+        return Response({
+            'valid': True,
+            'name': invite.name,
+            'email': invite.email,
+            'username': invite.username,
+            'school_role': invite.school_role,
+        }, status=status.HTTP_200_OK)
 
 
 class WorkerPageAccessView(APIView):

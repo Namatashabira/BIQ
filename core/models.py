@@ -140,6 +140,7 @@ class BusinessSettings(models.Model):
     tax_id = models.CharField(max_length=100, blank=True)
     registration_number = models.CharField(max_length=100, blank=True)
     website = models.URLField(blank=True)
+    motto = models.CharField(max_length=300, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

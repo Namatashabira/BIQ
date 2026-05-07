@@ -149,6 +149,8 @@ class WorkerAccessInvite(models.Model):
 
     name = models.CharField(max_length=150)
     email = models.EmailField()
+    username = models.CharField(max_length=150, blank=True, default='')
+    school_role = models.CharField(max_length=20, blank=True, default='')
     otp_code = models.CharField(max_length=12, db_index=True)
     otp_expires_at = models.DateTimeField()
     used = models.BooleanField(default=False)

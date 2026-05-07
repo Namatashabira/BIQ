@@ -6,20 +6,35 @@ User = get_user_model()
 
 
 class WorkerSerializer(serializers.ModelSerializer):
-    email = serializers.EmailField(source="user.email", read_only=True)
-    name = serializers.CharField(source="user.get_full_name", read_only=True)
-    tenant_name = serializers.CharField(source="tenant.name", read_only=True)
-    permissions = serializers.SerializerMethodField()
+    email       = serializers.EmailField(source='user.email', read_only=True)
+    name        = serializers.SerializerMethodField()
+    username    = serializers.CharField(source='user.username', read_only=True)
+    tenant_name = serializers.CharField(source='tenant.name', read_only=True)
+    school_role_display = serializers.CharField(source='get_school_role_display', read_only=True)
+    avatar_url  = serializers.SerializerMethodField()
 
     class Meta:
-        model = Worker
-        fields = ["id", "name", "email", "role", "tenant_name", "pages", "fields", "permissions"]
+        model  = Worker
+        fields = ['id', 'name', 'username', 'email', 'school_role', 'school_role_display',
+                  'tenant_name', 'pages', 'fields', 'avatar_url']
 
-    def get_permissions(self, obj):
-        return {
-            "pages": obj.pages,
-            "fields": obj.fields
-        }
+    def get_name(self, obj):
+        if obj.user:
+            full = obj.user.get_full_name()
+            return full if full.strip() else obj.user.username
+        return '—'
+
+    def get_avatar_url(self, obj):
+        if not obj.user:
+            return None
+        try:
+            profile = obj.user.profile
+            if profile.profile_picture:
+                url = profile.profile_picture.url
+                return url if url.startswith('http') else None
+        except Exception:
+            pass
+        return None
 
 
 class WorkerCreateSerializer(serializers.ModelSerializer):

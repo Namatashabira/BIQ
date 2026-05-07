@@ -95,7 +95,86 @@ class TenantWorkerViewSet(viewsets.ModelViewSet):
             user=worker_user
         )
 
-    @action(detail=True, methods=["put"])
+    @action(detail=True, methods=['put'], url_path='set-school-role')
+    def set_school_role(self, request, pk=None):
+        """Assign a school role, sync worker.pages AND WorkerPageAccess."""
+        user = request.user
+        if user.role not in ('tenant_admin', 'superadmin'):
+            raise PermissionDenied('Not allowed')
+
+        worker = (
+            get_object_or_404(Worker, pk=pk, tenant=user.tenant)
+            if user.role == 'tenant_admin'
+            else get_object_or_404(Worker, pk=pk)
+        )
+
+        role = request.data.get('school_role', '')
+
+        ROLE_PAGES = {
+            'teacher':     ['marks-entry', 'attendance'],
+            'bursar':      ['fees', 'school-receipt-lookup'],
+            'dos':         ['student-management', 'marks-entry', 'report-templates', 'attendance'],
+            'deputy':      ['student-management', 'marks-entry', 'fees', 'report-templates', 'attendance'],
+            'headteacher': ['dashboard', 'student-management', 'marks-entry', 'fees',
+                            'report-templates', 'attendance', 'analytics'],
+            'director':    ['dashboard', 'student-management', 'marks-entry', 'fees',
+                            'report-templates', 'attendance', 'analytics'],
+        }
+
+        if role not in ROLE_PAGES:
+            raise ValidationError({'school_role': f'Invalid role. Must be one of: {", ".join(ROLE_PAGES.keys())}'})
+
+        pages = ROLE_PAGES[role]
+
+        # 1. Update Worker record
+        worker.school_role = role
+        worker.pages = {p: True for p in pages}
+        worker.save()
+
+        # 2. Sync WorkerPageAccess so login-based page gating also reflects the new role
+        if worker.user:
+            from core.business_config import WorkerPageAccess
+            WorkerPageAccess.objects.update_or_create(
+                tenant=worker.tenant,
+                user=worker.user,
+                defaults={'allowed_pages': pages}
+            )
+
+        return Response(WorkerSerializer(worker).data)
+
+    @action(detail=True, methods=['post'], url_path='transfer-ownership')
+    def transfer_ownership(self, request, pk=None):
+        """Transfer tenant admin ownership to a worker. Only current tenant_admin can do this."""
+        user = request.user
+        if user.role not in ('tenant_admin', 'superadmin'):
+            raise PermissionDenied('Only the current admin can transfer ownership')
+
+        worker = get_object_or_404(Worker, pk=pk, tenant=user.tenant)
+        if not worker.user:
+            raise ValidationError('This worker has no user account yet')
+
+        tenant = user.tenant
+
+        with transaction.atomic():
+            # Promote the worker's user to tenant_admin
+            new_admin = worker.user
+            new_admin.role = 'tenant_admin'
+            new_admin.save(update_fields=['role'])
+
+            # Demote the current admin to worker role
+            user.role = 'worker'
+            user.save(update_fields=['role'])
+
+            # Update tenant.admin
+            tenant.admin = new_admin
+            tenant.save(update_fields=['admin'])
+
+            # Give the new admin a Worker record if missing
+            Worker.objects.get_or_create(tenant=tenant, user=new_admin)
+
+        return Response({'success': True, 'message': f'Ownership transferred to {new_admin.username}'})
+
+    @action(detail=True, methods=['put'])
     def permissions(self, request, pk=None):
         user = request.user
 

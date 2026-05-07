@@ -38,6 +38,8 @@ INSTALLED_APPS = [
     "plans",
     "students",
     "fees",
+    "school_accounting",
+    "schools",
 ]
 
 # Add Cloudinary apps only if the package is installed

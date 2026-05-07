@@ -53,6 +53,9 @@ urlpatterns = [
     # Fees management
     path('api/fees/', include('fees.urls')),
 
+    # School Accounting: expenses, salaries, income, debts, balance sheet
+    path('api/school-accounting/', include('school_accounting.urls')),
+
     # Schools: marks entry, report cards
     path('schools/', include('schools.urls')),
 ]
