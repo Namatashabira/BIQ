@@ -28,13 +28,10 @@ class WorkerSerializer(serializers.ModelSerializer):
         if not obj.user:
             return None
         try:
-            profile = obj.user.profile
-            if profile.profile_picture:
-                url = profile.profile_picture.url
-                return url if url.startswith('http') else None
+            from users.serializers import _stable_cloudinary_url
+            return _stable_cloudinary_url(obj.user.profile.profile_picture)
         except Exception:
-            pass
-        return None
+            return None
 
 
 class WorkerCreateSerializer(serializers.ModelSerializer):

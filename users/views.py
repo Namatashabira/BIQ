@@ -178,7 +178,7 @@ class UserProfileRetrieveUpdateView(generics.RetrieveUpdateAPIView):
 @api_view(['POST'])
 @permission_classes([IsAuthenticated])
 def upload_profile_picture(request):
-    """Upload profile picture to Cloudinary and save URL."""
+    """Upload profile picture to Cloudinary and return a stable canonical URL."""
     file = request.FILES.get('profile_picture')
     if not file:
         return Response({'error': 'No file provided'}, status=status.HTTP_400_BAD_REQUEST)
@@ -187,10 +187,9 @@ def upload_profile_picture(request):
     profile.profile_picture = file
     profile.save(update_fields=['profile_picture'])
 
-    try:
-        url = profile.profile_picture.url
-    except Exception:
-        url = None
+    # Use the serializer helper to get a stable URL
+    from .serializers import _stable_cloudinary_url
+    url = _stable_cloudinary_url(profile.profile_picture)
 
     return Response({'profile_picture_url': url}, status=status.HTTP_200_OK)
 

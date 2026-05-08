@@ -5,6 +5,25 @@ from .models import UserProfile
 User = get_user_model()
 
 
+def _stable_cloudinary_url(field):
+    """Return a stable, canonical Cloudinary HTTPS URL from a CloudinaryField."""
+    if not field:
+        return None
+    try:
+        import cloudinary
+        public_id = getattr(field, 'public_id', None) or (field.name if hasattr(field, 'name') and field.name else None)
+        if not public_id:
+            return None
+        url = cloudinary.CloudinaryImage(public_id).build_url(secure=True, fetch_format='auto', quality='auto')
+        return url if url and url.startswith('https://') else None
+    except Exception:
+        try:
+            raw = field.url
+            return raw if raw and raw.startswith('http') else None
+        except Exception:
+            return None
+
+
 class UserSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
@@ -21,16 +40,7 @@ class UserProfileSerializer(serializers.ModelSerializer):
         read_only_fields = ['id', 'profile_picture_url', 'created_at', 'updated_at']
 
     def get_profile_picture_url(self, obj):
-        if obj.profile_picture:
-            try:
-                url = obj.profile_picture.url
-                if url.startswith('http://') or url.startswith('https://'):
-                    return url
-                request = self.context.get('request')
-                return request.build_absolute_uri(url) if request else url
-            except Exception:
-                return None
-        return None
+        return _stable_cloudinary_url(obj.profile_picture)
 
 
 class UserRegisterSerializer(serializers.ModelSerializer):
