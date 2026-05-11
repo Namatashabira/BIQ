@@ -139,6 +139,7 @@ def register(request):
                 name=data.get('business_name'),
                 admin=user,
                 business_type=business_type,
+                school_type=data.get('school_type', '') if business_type == 'school' else '',
                 is_verified=True,
             )
 
@@ -170,7 +171,8 @@ def register(request):
             'tenant': {
                 'id': tenant.id,
                 'name': tenant.name,
-                'business_type': business_type
+                'business_type': business_type,
+                'school_type': tenant.school_type,
             },
             'message': 'Registration successful! Your business configuration has been set up.'
         }, status=status.HTTP_201_CREATED)
@@ -229,7 +231,8 @@ def login(request):
     tenant_info = {
         'id': tenant.id,
         'uuid': str(tenant.uuid),
-        'name': tenant.name
+        'name': tenant.name,
+        'school_type': getattr(tenant, 'school_type', ''),
     } if tenant else None
 
     # Fetch school_role from Worker record if exists

@@ -371,10 +371,26 @@ def generate_report_data(student, term, academic_year, tenant=None):
     overall_score = calculate_overall_average(student, term, academic_year, tenant)
     overall_grade_info = get_grade_and_remark(overall_score, tenant)
     
-    # Generate teacher comment
+    # Generate teacher comment (rule-based fallback)
     teacher_comment = generate_teacher_comment(
         student, overall_score, subject_scores, tenant
     )
+
+    # Generate AI comment and use it if available
+    try:
+        from ai_comments.services import generate_ai_comment
+        subject_perf_dict = {s['subject_name']: {'score': s['score'], 'grade': s['grade']} for s in subject_performance}
+        ai_comment, used_ai = generate_ai_comment(
+            student_name=f"{student.first_name} {student.last_name}",
+            overall_score=overall_score,
+            subject_performance=subject_perf_dict,
+            term=term,
+            academic_year=academic_year
+        )
+        if used_ai:
+            teacher_comment = ai_comment
+    except Exception:
+        pass  # keep rule-based comment on any error
     
     return {
         'student': {
@@ -394,6 +410,7 @@ def generate_report_data(student, term, academic_year, tenant=None):
             'grade': overall_grade_info['grade'],
             'remark': overall_grade_info['remark'],
             'teacher_comment': teacher_comment,
+            'ai_comment': teacher_comment,
             'total_subjects': len(subject_performance)
         },
         'metadata': {

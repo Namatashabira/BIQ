@@ -3,7 +3,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.permissions import IsAuthenticated
-from .models import Student, Stream, Guardian, StudentHistory, StudentMark, GeneratedReport, Attendance, CLASS_CHOICES
+from .models import Student, Stream, Guardian, StudentHistory, StudentMark, GeneratedReport, Attendance, CLASS_CHOICES, SCHOOL_TYPE_CHOICES
 from .serializers import (
     StudentSerializer, StreamSerializer,
     GuardianSerializer, StudentHistorySerializer, StudentMarkSerializer,
@@ -82,8 +82,13 @@ class StudentViewSet(TenantScopedMixin, viewsets.ModelViewSet):
     def meta(self, request):
         tenant = self.get_tenant()
         streams_qs = Stream.objects.filter(tenant=tenant) if tenant else Stream.objects.none()
+        primary_classes = [v for v, _ in CLASS_CHOICES if v in ('Baby','Middle','Top') or v.startswith('P.')]
+        secondary_classes = [v for v, _ in CLASS_CHOICES if v.startswith('S.')]
         return Response({
             'classes': [{'value': v, 'label': l} for v, l in CLASS_CHOICES],
+            'primary_classes': primary_classes,
+            'secondary_classes': secondary_classes,
+            'school_types': [{'value': v, 'label': l} for v, l in SCHOOL_TYPE_CHOICES],
             'streams': StreamSerializer(streams_qs, many=True).data,
         })
 

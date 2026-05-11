@@ -141,6 +141,8 @@ class BusinessSettings(models.Model):
     registration_number = models.CharField(max_length=100, blank=True)
     website = models.URLField(blank=True)
     motto = models.CharField(max_length=300, blank=True)
+    # Stores list of {role, name, title, signature_mode, signature_image, signature_name}
+    staff_credentials = models.JSONField(default=list, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 

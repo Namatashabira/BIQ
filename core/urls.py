@@ -34,6 +34,7 @@ from .views_config import (
     WorkerAccessActivateView,
     WorkerAccessCheckOtpView,
     WorkerPageAccessView,
+    StaffCredentialsView,
 )
 from .views_ai import (
     ai_sales_forecast,
@@ -68,6 +69,7 @@ urlpatterns = [
     path('access/activate/', WorkerAccessActivateView.as_view(), name='access-activate'),
     path('access/check-otp/', WorkerAccessCheckOtpView.as_view(), name='access-check-otp'),
     path('access/pages/', WorkerPageAccessView.as_view(), name='access-pages'),
+    path('staff-credentials/', StaffCredentialsView.as_view(), name='staff-credentials'),
     
     # Existing endpoints
     path('superadmin-summary/', SuperAdminTenantSummaryView.as_view(), name='superadmin-summary'),

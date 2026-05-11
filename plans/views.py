@@ -19,6 +19,17 @@ def list_plans(request):
 @api_view(['GET'])
 @permission_classes([IsAuthenticated])
 def my_subscription(request):
+    # Superadmin is the owner — always has full unlimited access
+    if request.user.is_superuser or getattr(request.user, 'role', None) == 'superadmin':
+        return Response({
+            'plan': {'key': 'enterprise', 'name': 'Owner', 'product_limit': -1, 'trial_days': 0, 'allowed_pages': []},
+            'status': 'active',
+            'is_trial_expired': False,
+            'days_left': None,
+            'trial_start': None,
+            'trial_end': None,
+        })
+
     tenant = getattr(request.user, 'tenant', None)
     if not tenant:
         return Response({'error': 'No tenant found for this user.'}, status=status.HTTP_404_NOT_FOUND)

@@ -392,6 +392,7 @@ def get_configuration_summary(request):
     
     return Response({
         'business_type': config.business_type,
+        'school_type': getattr(tenant, 'school_type', ''),
         'features': features,
         'labels': labels,
         'theme': theme_data,
@@ -654,6 +655,40 @@ class WorkerPageAccessView(APIView):
         )
 
         return Response({'success': True, 'access': WorkerPageAccessSerializer(access).data})
+
+
+class StaffCredentialsView(APIView):
+    """GET/POST staff credentials (name, title, signature) per role for report cards."""
+    permission_classes = [IsAuthenticated]
+
+    def _get_tenant(self, request):
+        user = request.user
+        tenant = getattr(user, 'tenant', None)
+        if not tenant:
+            membership = TenantMembership.objects.filter(user=user).first()
+            tenant = membership.tenant if membership else None
+        return tenant
+
+    def get(self, request):
+        from core.models import BusinessSettings
+        tenant = self._get_tenant(request)
+        if not tenant:
+            return Response({'staff_credentials': []})
+        bs = BusinessSettings.get_settings(tenant)
+        return Response({'staff_credentials': bs.staff_credentials or []})
+
+    def post(self, request):
+        from core.models import BusinessSettings
+        tenant = self._get_tenant(request)
+        if not tenant:
+            return Response({'error': 'No tenant'}, status=400)
+        if getattr(request.user, 'role', '') not in ('tenant_admin', 'superadmin') and not request.user.is_staff:
+            return Response({'error': 'Only admins can update staff credentials'}, status=403)
+        bs = BusinessSettings.get_settings(tenant)
+        credentials = request.data.get('staff_credentials', [])
+        bs.staff_credentials = credentials
+        bs.save(update_fields=['staff_credentials'])
+        return Response({'staff_credentials': bs.staff_credentials})
 
 
 class PricingSettingsView(APIView):

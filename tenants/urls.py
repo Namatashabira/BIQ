@@ -1,5 +1,5 @@
 from django.urls import path
-from .views import TenantWorkerViewSet, TenantViewSet
+from .views import TenantWorkerViewSet, TenantViewSet, update_school_type
 
 # Tenant endpoints
 tenant_list = TenantViewSet.as_view({
@@ -45,4 +45,5 @@ urlpatterns = [
     path('workers/<int:pk>/permissions/', worker_permissions, name='worker-permissions'),
     path('workers/<int:pk>/set-school-role/', worker_set_school_role, name='worker-set-school-role'),
     path('workers/<int:pk>/transfer-ownership/', worker_transfer_ownership, name='worker-transfer-ownership'),
+    path('school-type/', update_school_type, name='update-school-type'),
 ]

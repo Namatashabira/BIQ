@@ -6,8 +6,30 @@ except ImportError:
     _cloudinary_available = False
 
 CLASS_CHOICES = [
-    ('S.1', 'S.1'), ('S.2', 'S.2'), ('S.3', 'S.3'),
-    ('S.4', 'S.4'), ('S.5', 'S.5'), ('S.6', 'S.6'),
+    # Primary
+    ('Baby', 'Baby Class'),
+    ('Middle', 'Middle Class'),
+    ('Top', 'Top Class'),
+    ('P.1', 'Primary 1'),
+    ('P.2', 'Primary 2'),
+    ('P.3', 'Primary 3'),
+    ('P.4', 'Primary 4'),
+    ('P.5', 'Primary 5'),
+    ('P.6', 'Primary 6'),
+    ('P.7', 'Primary 7'),
+    # Secondary
+    ('S.1', 'Senior 1'),
+    ('S.2', 'Senior 2'),
+    ('S.3', 'Senior 3'),
+    ('S.4', 'Senior 4'),
+    ('S.5', 'Senior 5'),
+    ('S.6', 'Senior 6'),
+]
+
+SCHOOL_TYPE_CHOICES = [
+    ('primary', 'Primary School'),
+    ('secondary', 'Secondary School'),
+    ('combined', 'Combined School'),
 ]
 
 
@@ -28,6 +50,7 @@ class Student(models.Model):
     GENDER_CHOICES = [('male', 'Male'), ('female', 'Female'), ('other', 'Other')]
 
     tenant = models.ForeignKey('tenants.Tenant', on_delete=models.CASCADE, null=True, blank=True, related_name='school_students', db_index=True)
+    school_type = models.CharField(max_length=20, choices=SCHOOL_TYPE_CHOICES, default='secondary', blank=True)
     first_name = models.CharField(max_length=50)
     last_name = models.CharField(max_length=50)
     date_of_birth = models.DateField(null=True, blank=True)

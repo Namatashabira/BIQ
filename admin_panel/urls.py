@@ -58,6 +58,9 @@ urlpatterns = [
 
     # Schools: marks entry, report cards
     path('schools/', include('schools.urls')),
+
+    # AI Comments: AI-generated report card comments
+    path('api/ai-comments/', include('ai_comments.urls')),
 ]
 
 # Serve media files in development

@@ -45,6 +45,18 @@ class Tenant(models.Model):
     schema_name = models.CharField(max_length=64, null=True, blank=True, help_text='Schema name for multi-tenancy (optional)')
     domain_url = models.CharField(max_length=255, null=True, blank=True, help_text='Domain URL for tenant (optional)')
 
+    SCHOOL_TYPE_CHOICES = [
+        ('primary', 'Primary School'),
+        ('secondary', 'Secondary School'),
+    ]
+    school_type = models.CharField(
+        max_length=20,
+        choices=SCHOOL_TYPE_CHOICES,
+        blank=True,
+        default='',
+        help_text='Only applicable when business_type is school'
+    )
+
     is_verified = models.BooleanField(default=False, help_text='Tenant account must be verified to access system')
     created_at = models.DateTimeField(auto_now_add=True)
 

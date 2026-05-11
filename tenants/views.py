@@ -1,5 +1,5 @@
 from rest_framework import viewsets
-from rest_framework.decorators import action
+from rest_framework.decorators import action, api_view, permission_classes
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.exceptions import PermissionDenied, ValidationError
@@ -323,3 +323,24 @@ class TenantViewSet(viewsets.ModelViewSet):
             raise PermissionDenied("Only superadmin can delete tenants")
 
         return super().destroy(request, *args, **kwargs)
+
+
+@api_view(['PATCH'])
+@permission_classes([IsAuthenticated])
+def update_school_type(request):
+    """Allow tenant admin to set/update their school_type (primary or secondary)."""
+    user = request.user
+    tenant = getattr(user, 'tenant', None)
+    if not tenant:
+        raise ValidationError({'detail': 'No tenant found for this user'})
+    if user.role not in ('tenant_admin', 'superadmin') and not user.is_staff:
+        raise PermissionDenied('Only admins can update school type')
+
+    school_type = request.data.get('school_type', '').strip()
+    valid = ('primary', 'secondary', '')
+    if school_type not in valid:
+        raise ValidationError({'school_type': f'Must be one of: {valid}'})
+
+    tenant.school_type = school_type
+    tenant.save(update_fields=['school_type'])
+    return Response({'school_type': tenant.school_type})
