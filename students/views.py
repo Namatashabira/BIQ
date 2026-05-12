@@ -2,7 +2,7 @@ from rest_framework import viewsets, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
-from rest_framework.permissions import IsAuthenticated
+from rest_framework.permissions import IsAuthenticated, AllowAny
 from .models import Student, Stream, Guardian, StudentHistory, StudentMark, GeneratedReport, Attendance, CLASS_CHOICES, SCHOOL_TYPE_CHOICES
 from .serializers import (
     StudentSerializer, StreamSerializer,
@@ -225,8 +225,9 @@ class StudentMarkViewSet(TenantScopedMixin, viewsets.ModelViewSet):
                 'academic_year': item.get('academic_year'),
             }
             defaults = {
-                'ca_score': item.get('ca_score'),
-                'exam_score': item.get('exam_score'),
+                'a1_score': item.get('a1_score'),
+                'a2_score': item.get('a2_score'),
+                'a3_score': item.get('a3_score'),
                 'competency': item.get('competency', ''),
                 'tenant': tenant,
             }
@@ -319,6 +320,11 @@ class GeneratedReportViewSet(TenantScopedMixin, viewsets.ModelViewSet):
                         'tenant': tenant,
                     }
                 )
+                # Inject the token back into report_data so the QR URL is correct
+                rd = obj.report_data or {}
+                rd['report_token'] = str(obj.secure_token)
+                obj.report_data = rd
+                obj.save(update_fields=['report_data'])
                 saved.append(obj.id)
             except Exception as e:
                 errors.append({'student': item.get('student'), 'error': str(e)})
@@ -326,3 +332,15 @@ class GeneratedReportViewSet(TenantScopedMixin, viewsets.ModelViewSet):
             {'saved': len(saved), 'errors': errors},
             status=status.HTTP_207_MULTI_STATUS if errors else status.HTTP_200_OK
         )
+
+    @action(detail=False, methods=['get'], url_path='by-token', permission_classes=[AllowAny])
+    def by_token(self, request):
+        token = request.query_params.get('token', '')
+        if not token:
+            return Response({'error': 'token required'}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            report = GeneratedReport.objects.get(secure_token=token)
+        except (GeneratedReport.DoesNotExist, Exception):
+            return Response({'error': 'Report not found'}, status=status.HTTP_404_NOT_FOUND)
+        from .serializers import GeneratedReportSerializer
+        return Response(GeneratedReportSerializer(report).data)

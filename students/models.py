@@ -1,3 +1,4 @@
+import uuid
 from django.db import models
 try:
     from cloudinary.models import CloudinaryField
@@ -130,6 +131,7 @@ class GeneratedReport(models.Model):
     academic_year = models.CharField(max_length=20)
     template = models.CharField(max_length=20, default='modern')
     report_data = models.JSONField()          # full data snapshot
+    secure_token = models.UUIDField(default=uuid.uuid4, unique=True, db_index=True)
     generated_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -141,15 +143,16 @@ class GeneratedReport(models.Model):
 
 
 class StudentMark(models.Model):
-    """Stores CA + Exam marks per student per subject per term."""
+    """Stores A1, A2, A3 marks per student per subject per term."""
     student = models.ForeignKey(Student, on_delete=models.CASCADE, related_name='marks')
     tenant = models.ForeignKey('tenants.Tenant', on_delete=models.CASCADE, null=True, blank=True, db_index=True)
     subject = models.CharField(max_length=100)
     competency = models.CharField(max_length=200, blank=True)
     term = models.CharField(max_length=20)          # e.g. Term 1
     academic_year = models.CharField(max_length=20) # e.g. 2024-2025
-    ca_score = models.FloatField(null=True, blank=True)
-    exam_score = models.FloatField(null=True, blank=True)
+    a1_score = models.FloatField(null=True, blank=True)  # Assessment 1 (20%)
+    a2_score = models.FloatField(null=True, blank=True)  # Assessment 2 (20%)
+    a3_score = models.FloatField(null=True, blank=True)  # Exam (80%)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
 
@@ -159,7 +162,21 @@ class StudentMark(models.Model):
 
     @property
     def total(self):
-        return (self.ca_score or 0) + (self.exam_score or 0)
+        """Calculate total mark: ((A1+A2)/2) * 0.2 + A3 * 0.8"""
+        a1 = self.a1_score
+        a2 = self.a2_score
+        a3 = self.a3_score
+        if a3 is None or a3 == 0:
+            return 0
+        if a1 is not None and a2 is not None:
+            assessment_avg = (a1 + a2) / 2
+        elif a1 is not None:
+            assessment_avg = a1
+        elif a2 is not None:
+            assessment_avg = a2
+        else:
+            assessment_avg = 0
+        return (assessment_avg * 0.2) + (a3 * 0.8)
 
     @property
     def grade(self):
